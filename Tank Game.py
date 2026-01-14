@@ -31,6 +31,7 @@ FPS_CAP = 144
 RECOIL_MULT = 1.0 # Default = 1       (Recoil multiplier)
                   # Off = 0
 SAVE_PATH = "save.json"
+LEADERBOARD_LIMIT = 10
 
 COINS_SCORE_DIV = 50
 COINS_PER_WAVE = 4
@@ -257,6 +258,7 @@ class SaveManager:
         self.selected_weapon: str = "pistol"
         self.cosmetic_outline_alt: bool = False
         self.settings: Dict[str, bool] = {"audio": True, "shake": True}
+        self.leaderboard: List[Dict[str, int]] = []
         self.load()
 
     def defaults(self):
@@ -275,6 +277,7 @@ class SaveManager:
         self.selected_weapon = "pistol"
         self.cosmetic_outline_alt = False
         self.settings = {"audio": True, "shake": True}
+        self.leaderboard = []
 
     def ensure_weapons(self, weapon_ids: List[str]) -> bool:
         """Future-proof: ensure save file contains keys for every weapon in WEAPONS."""
@@ -309,6 +312,7 @@ class SaveManager:
             self.selected_weapon = str(data.get("selected_weapon", self.selected_weapon))
             self.cosmetic_outline_alt = bool(data.get("cosmetic_outline_alt", False))
             self.settings = dict(data.get("settings", self.settings))
+            self.leaderboard = list(data.get("leaderboard", []))
 
             for k in ["meta_damage", "meta_move", "meta_hp", "meta_xp", "meta_dash", "meta_armor", "meta_bulletspeed"]:
                 if k not in self.shop_levels:
@@ -324,6 +328,17 @@ class SaveManager:
 
             if not self.weapon_unlocks.get(self.selected_weapon, False):
                 self.selected_weapon = "pistol"
+
+            self.leaderboard = [
+                e for e in self.leaderboard
+                if isinstance(e, dict)
+                and "score" in e
+                and "time" in e
+                and "wave" in e
+                and "level" in e
+            ]
+            self.leaderboard.sort(key=lambda e: (e["score"], e["wave"], e["time"]), reverse=True)
+            self.leaderboard = self.leaderboard[:LEADERBOARD_LIMIT]
         except Exception:
             self.defaults()
 
@@ -336,11 +351,31 @@ class SaveManager:
                 "selected_weapon": self.selected_weapon,
                 "cosmetic_outline_alt": bool(self.cosmetic_outline_alt),
                 "settings": self.settings,
+                "leaderboard": self.leaderboard,
             }
             with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except Exception:
             pass
+
+    def add_leaderboard_entry(self, score: int, time_s: int, wave: int, level: int):
+        entry = {
+            "score": int(score),
+            "time": int(time_s),
+            "wave": int(wave),
+            "level": int(level),
+        }
+        self.leaderboard.append(entry)
+        self.leaderboard = [
+            e for e in self.leaderboard
+            if isinstance(e, dict)
+            and "score" in e
+            and "time" in e
+            and "wave" in e
+            and "level" in e
+        ]
+        self.leaderboard.sort(key=lambda e: (e["score"], e["wave"], e["time"]), reverse=True)
+        self.leaderboard = self.leaderboard[:LEADERBOARD_LIMIT]
 
 
 # =========================================================
@@ -1366,7 +1401,7 @@ class Game:
         self._init_audio()
 
         # State
-        self.state = "menu"  # menu, weapons, shop, controls, playing, paused, levelup, gameover
+        self.state = "menu"  # menu, weapons, shop, controls, leaderboard, playing, paused, levelup, gameover
         self.running = True
 
         # Camera
@@ -1413,6 +1448,7 @@ class Game:
         self.menu_buttons: List[Button] = []
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
+        self.leaderboard_back_btn: Optional[Button] = None
         self.pause_buttons: List[Button] = []
         self.gameover_buttons: List[Button] = []
 
@@ -1432,6 +1468,7 @@ class Game:
 
         self.last_run_coins_earned = 0
         self.coins_awarded_this_gameover = False
+        self.leaderboard_recorded = False
 
         self._build_menus()
 
@@ -1493,6 +1530,7 @@ class Game:
             Button(pygame.Rect(cx - bw // 2, top + gap * 0, bw, bh), "Start Run", self.start_run),
             Button(pygame.Rect(cx - bw // 2, top + gap * 1, bw, bh), "Weapons", self.open_weapons_screen),
             Button(pygame.Rect(cx - bw // 2, top + gap * 2, bw, bh), "Shop", self.open_shop),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Leaderboard", self.open_leaderboard),
         ]
         self.menu_quit_btn = Button(
     pygame.Rect(20, 18, 54, 48),
@@ -1502,6 +1540,7 @@ class Game:
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
 
         # Weapons pagination buttons (bottom-right)
         self.weapon_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_weapon_page(-1))
@@ -1565,6 +1604,9 @@ class Game:
         self.shop_tab = "meta"
         self.shop_page = 0
         self.set_state("shop")
+
+    def open_leaderboard(self):
+        self.set_state("leaderboard")
 
     def change_shop_page(self, delta: int):
         self.shop_page = max(0, self.shop_page + delta)
@@ -1692,6 +1734,7 @@ class Game:
         self.last_run_coins_earned = 0
         self.coins_awarded_this_gameover = False
         self.run_bonus_coins = 0
+        self.leaderboard_recorded = False
 
         self.in_boss_fight = False
         self.boss_alive = False
@@ -2049,6 +2092,18 @@ class Game:
         self.save.save()
         self.coins_awarded_this_gameover = True
 
+    def record_leaderboard_if_needed(self):
+        if self.leaderboard_recorded:
+            return
+        self.save.add_leaderboard_entry(
+            score=self.player.score,
+            time_s=int(self.survival_time),
+            wave=self.wave,
+            level=self.player.level,
+        )
+        self.save.save()
+        self.leaderboard_recorded = True
+
     # ---------------- Events ----------------
     def handle_events(self):
         events = pygame.event.get()
@@ -2057,7 +2112,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop"):
+                if self.state in ("controls", "weapons", "shop", "leaderboard"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -2776,6 +2831,44 @@ class Game:
             y += 42
         draw_text(self.screen, self.font_ui, "Press ESC / Backspace to return", (WIDTH // 2, HEIGHT - 60), C_TEXT_DIM, center=True, shadow=False)
 
+    def draw_leaderboard(self, events):
+        self.screen.fill(C_BG)
+        cx = WIDTH // 2
+
+        draw_text(self.screen, self.font_big, "LEADERBOARD", (cx, 92), C_TEXT, center=True)
+        draw_text(self.screen, self.font_ui, "Top runs by score", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
+
+        box = pygame.Rect(120, 170, WIDTH - 240, HEIGHT - 280)
+        pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
+
+        header_y = box.y + 18
+        draw_text(self.screen, self.font_ui, "#", (box.x + 30, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "Score", (box.x + 90, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "Time", (box.x + 300, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "Wave", (box.x + 470, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "Level", (box.x + 600, header_y), C_TEXT_DIM, shadow=False)
+
+        entries = list(self.save.leaderboard)
+        if not entries:
+            draw_text(self.screen, self.font_med, "No runs yet — play a game to set a score!", (cx, box.centery), C_TEXT_DIM, center=True, shadow=False)
+        else:
+            row_y = header_y + 36
+            row_gap = 34
+            for idx, entry in enumerate(entries, start=1):
+                draw_text(self.screen, self.font_ui, f"{idx}.", (box.x + 30, row_y), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['score']}", (box.x + 90, row_y), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['time']}s", (box.x + 300, row_y), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['wave']}", (box.x + 470, row_y), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['level']}", (box.x + 600, row_y), C_TEXT, shadow=False)
+                row_y += row_gap
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+        if self.leaderboard_back_btn:
+            self.leaderboard_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.leaderboard_back_btn.draw(self.screen, self.font_med)
+
     def draw_weapons(self, events):
         self.screen.fill(C_BG)
         cx = WIDTH // 2
@@ -3081,6 +3174,7 @@ class Game:
 
     def draw_gameover(self, events):
         self.award_coins_if_needed()
+        self.record_leaderboard_if_needed()
         self.draw_background()
         self.draw_obstacles()
         self.draw_entities()
@@ -3156,6 +3250,9 @@ class Game:
 
             elif self.state == "controls":
                 self.draw_controls()
+
+            elif self.state == "leaderboard":
+                self.draw_leaderboard(events)
 
             elif self.state == "paused":
                 self.update_camera(dt)
