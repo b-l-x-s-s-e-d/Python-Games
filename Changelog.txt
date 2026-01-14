@@ -64,6 +64,11 @@ v1.3.3
 1. Decreased Boss default damage from 2hp -> 1hp
 2. Decreased Boss bullet speed from 310 -> 270
 
+v1.3.4
+1. Added a "Leaderboard" tab on the main menu displaying player's top 10 runs
+2. Fixed a bug where piercing would not work properly on rocket and tank
+3. Fixed a bug where the game would crash upon opening
+
 To-Do Features:
 1. Enable fullscreen mode.
 2. Remove the Controls button, and replace the Quit button with an “X” in the top‑left corner.
@@ -73,3 +78,4 @@ To-Do Features:
 6. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
 7. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 8. Add "Bundles" into the shop
+
