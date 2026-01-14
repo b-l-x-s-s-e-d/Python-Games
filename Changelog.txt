@@ -71,12 +71,11 @@ v1.4
 
 To-Do Features:
 1. Enable fullscreen mode.
-2. Remove the Controls button, and replace the Quit button with an “X” in the top‑left corner.
-3. Add a Leaderboard tab showing top runs, including time, wave, and score.
 4. Redesign the main menu title and the weapon/coins panel for improved presentation.
 5. Add a “Story Mode” featuring level‑based progression similar to Geometry Dash or Mario.
 6. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
 7. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 8. Add "Bundles" to the shop
+
 
 
