@@ -1,10 +1,10 @@
 {
-  "coins": 83,
+  "coins": 0,
   "shop_levels": {
-    "meta_damage": 4,
+    "meta_damage": 0,
     "meta_move": 0,
-    "meta_hp": 1,
-    "meta_xp": 2,
+    "meta_hp": 0,
+    "meta_xp": 0,
     "meta_dash": 0,
     "meta_armor": 0,
     "meta_bulletspeed": 0
@@ -14,20 +14,21 @@
     "cannon": false,
     "minigun": false,
     "burst": false,
-    "shotgun": true,
+    "shotgun": false,
     "rocket": true,
     "tesla": false,
     "sniper": false,
-    "flamethrower": true,
+    "flamethrower": false,
     "omni_pistol": false,
     "windscreen_wiper": false,
-    "electricity": true,
-    "tank": true
+    "electricity": false,
+    "tank": false
   },
-  "selected_weapon": "electricity",
+  "selected_weapon": "pistol",
   "cosmetic_outline_alt": false,
   "settings": {
     "audio": true,
     "shake": true
   }
+
 }
