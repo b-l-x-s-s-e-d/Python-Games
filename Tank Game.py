@@ -1069,7 +1069,6 @@ SHOP_ITEMS = [
     ShopItemDef("meta_xp", "+5% XP Gain", "Permanent: gain more XP from orbs.", 10, 35, 1.35, "meta"),
     ShopItemDef("meta_dash", "-5% Dash Cooldown", "Permanent: dash comes back faster.", 10, 45, 1.35, "meta"),
     ShopItemDef("armor", "+10% Damage Resistance", "Permanent: take less damage.", 10, 45, 1.35, "meta"),
-"meta"),
     ShopItemDef("meta_bulletspeed", "+5% Bullet Speed", "Permanent: faster bullets.", 10, 30, 1.35, "meta"),
 
     # WEAPONS (unlocks)
@@ -3180,3 +3179,4 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
