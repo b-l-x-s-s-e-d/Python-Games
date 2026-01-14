@@ -64,10 +64,17 @@ v1.3.3
 1. Decreased Boss default damage from 2hp -> 1hp
 2. Decreased Boss bullet speed from 310 -> 270
 
-v1.4
-1. Added a "Leaderboard" tab on the main menu displaying players' top 10 runs
+v1.3.4
+1. Added a "Leaderboard" tab on the main menu, displaying players' top 10 runs
 2. Fixed a bug where piercing would not work properly on the rocket and tank
 3. Fixed a bug where the game would crash upon opening
+
+v1.4
+1. Added "Bundles" to the shop
+2. Added more cosmetics like trails and bullet colours
+3. Added daily and weekly challenges
+4. Added weapon mastery system
+5. Fixed "Leaderboard" tab not appearing on the main menu
 
 To-Do Features:
 1. Enable fullscreen mode.
@@ -75,7 +82,7 @@ To-Do Features:
 5. Add a “Story Mode” featuring level‑based progression similar to Geometry Dash or Mario.
 6. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
 7. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
-8. Add "Bundles" to the shop
+
 
 
 
