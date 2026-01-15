@@ -2057,8 +2057,8 @@ class Game:
         weapon_ids = list(WEAPONS.keys())
         candidates = [
             {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 40, "metric": "kills"},
-            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 30, "metric": "waves"},
-            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 25, "metric": "runs"},
+            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 25, "metric": "waves"},
+            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 15, "metric": "runs"},
         ]
         weapon_pick = rng.choice(weapon_ids)
         weapon_name = WEAPONS[weapon_pick].name
@@ -2067,7 +2067,7 @@ class Game:
             "name": f"Weapon Focus: {weapon_name}",
             "desc": f"Defeat 25 enemies using {weapon_name}.",
             "target": 25,
-            "reward": 35,
+            "reward": 30,
             "metric": "weapon_kills",
             "weapon_id": weapon_pick,
         })
@@ -2085,10 +2085,10 @@ class Game:
     def _generate_weekly_challenges(self, key: str) -> List[Dict[str, object]]:
         rng = random.Random(key)
         candidates = [
-            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 2 bosses.", "target": 2, "reward": 160, "metric": "boss_kills"},
-            {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 4000 total damage.", "target": 4000, "reward": 180, "metric": "damage"},
-            {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 18.", "target": 18, "reward": 200, "metric": "high_wave"},
-            {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 5 runs.", "target": 5, "reward": 140, "metric": "runs"},
+            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 3 bosses.", "target": 3, "reward": 120, "metric": "boss_kills"},
+            {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 9000 total damage.", "target": 9000, "reward": 130, "metric": "damage"},
+            {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 20.", "target": 20, "reward": 150, "metric": "high_wave"},
+            {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 8 runs.", "target": 8, "reward": 100, "metric": "runs"},
         ]
         count = rng.randint(1, 2)
         picks = rng.sample(candidates, count)
@@ -4208,3 +4208,4 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
