@@ -15,6 +15,7 @@ import json
 import random
 import time
 import struct
+import traceback
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
 
@@ -366,15 +367,22 @@ class SaveManager:
     def ensure_mastery(self, weapon_ids: List[str]) -> bool:
         changed = False
         for wid in weapon_ids:
-            if wid not in self.weapon_mastery or not isinstance(self.weapon_mastery.get(wid), dict):
-                self.weapon_mastery[wid] = {}
+            _, entry_changed = self.ensure_mastery_entry(wid)
+            if entry_changed:
                 changed = True
-            stats = self.weapon_mastery[wid]
-            for key in ("kills", "hits", "games", "level"):
-                if key not in stats:
-                    stats[key] = 0
-                    changed = True
         return changed
+
+    def ensure_mastery_entry(self, weapon_id: str) -> Tuple[Dict[str, int], bool]:
+        changed = False
+        if weapon_id not in self.weapon_mastery or not isinstance(self.weapon_mastery.get(weapon_id), dict):
+            self.weapon_mastery[weapon_id] = {}
+            changed = True
+        stats = self.weapon_mastery[weapon_id]
+        for key in ("kills", "hits", "games", "level"):
+            if key not in stats:
+                stats[key] = 0
+                changed = True
+        return stats, changed
 
     def load(self):
         self.defaults()
@@ -1649,6 +1657,11 @@ class Game:
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
         self.challenges_back_btn: Optional[Button] = None
+        self.challenges_next_btn: Optional[Button] = None
+        self.challenges_prev_btn: Optional[Button] = None
+        self.challenges_view = "daily"
+        self.challenges_page = 0
+        self.challenge_tabs: List[TabButton] = []
         self.pause_buttons: List[Button] = []
         self.gameover_buttons: List[Button] = []
 
@@ -1667,6 +1680,7 @@ class Game:
         self.weapon_notice_timer = 0.0
         self.weapons_view = "weapons"
         self.weapon_tabs: List[TabButton] = []
+        self.mastery_error_logged = False
 
         self.progress_dirty = False
         self.progress_dirty_timer = 0.0
@@ -1755,6 +1769,8 @@ class Game:
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.challenges_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_challenges_page(-1))
+        self.challenges_next_btn = Button(pygame.Rect(WIDTH - 170, HEIGHT - 80, 120, 52), "Next", lambda: self.change_challenges_page(1))
 
         # Weapons pagination buttons (bottom-right)
         self.weapon_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_weapon_page(-1))
@@ -1807,6 +1823,22 @@ class Game:
             TabButton(pygame.Rect(wtab_start_x + wtab_w + wtab_gap, wtab_y, wtab_w, wtab_h), "MASTERY", set_weapon_view, "mastery"),
         ]
 
+        # Challenges tabs
+        ctab_y = 124
+        ctab_w = 200
+        ctab_h = 40
+        ctab_gap = 14
+        ctab_start_x = (WIDTH - (ctab_w * 2 + ctab_gap)) // 2
+
+        def set_challenges_view(view: str):
+            self.challenges_view = view
+            self.challenges_page = 0
+
+        self.challenge_tabs = [
+            TabButton(pygame.Rect(ctab_start_x, ctab_y, ctab_w, ctab_h), "DAILY", set_challenges_view, "daily"),
+            TabButton(pygame.Rect(ctab_start_x + ctab_w + ctab_gap, ctab_y, ctab_w, ctab_h), "WEEKLY", set_challenges_view, "weekly"),
+        ]
+
     def set_state(self, st: str):
         self.state = st
 
@@ -1840,7 +1872,12 @@ class Game:
         self.set_state("leaderboard")
 
     def open_challenges(self):
+        self.challenges_view = "daily"
+        self.challenges_page = 0
         self.set_state("challenges")
+
+    def change_challenges_page(self, delta: int):
+        self.challenges_page = max(0, self.challenges_page + delta)
 
     # ---------------- Cosmetics ----------------
     def get_cosmetic(self, cosmetic_id: str) -> Optional[CosmeticDef]:
@@ -2077,9 +2114,11 @@ class Game:
 
     # ---------------- Mastery ----------------
     def update_mastery(self, weapon_id: str, hits: int = 0, kills: int = 0, games: int = 0):
-        stats = self.save.weapon_mastery.get(weapon_id)
-        if not stats:
+        if weapon_id not in WEAPONS:
             return
+        stats, changed = self.save.ensure_mastery_entry(weapon_id)
+        if changed:
+            self.save.save()
         stats["hits"] = int(stats.get("hits", 0)) + hits
         stats["kills"] = int(stats.get("kills", 0)) + kills
         stats["games"] = int(stats.get("games", 0)) + games
@@ -2156,6 +2195,7 @@ class Game:
         self.weapon_notice_text = ""
         self.weapon_notice_timer = 0.0
         self.weapons_view = "weapons"
+        self.mastery_error_logged = False
         self.set_state("weapons")
 
     def change_weapon_page(self, delta: int):
@@ -3402,17 +3442,24 @@ class Game:
         cx = WIDTH // 2
 
         draw_text(self.screen, self.font_big, "CHALLENGES", (cx, 92), C_TEXT, center=True)
-        draw_text(self.screen, self.font_ui, "Daily + Weekly goals reset automatically", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
+        subtitle = "Daily goals reset automatically" if self.challenges_view == "daily" else "Weekly goals reset automatically"
+        draw_text(self.screen, self.font_ui, subtitle, (cx, 128), C_TEXT_DIM, center=True, shadow=False)
 
-        box = pygame.Rect(120, 170, WIDTH - 240, HEIGHT - 280)
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+
+        for tab in self.challenge_tabs:
+            tab.update(mouse_pos, mouse_down)
+            tab.draw(self.screen, self.font_shop_item, active=(tab.tab_id == self.challenges_view))
+
+        box = pygame.Rect(120, 190, WIDTH - 240, HEIGHT - 300)
         pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
-        daily_rect = pygame.Rect(box.x + 12, box.y + 12, box.w - 24, (box.h // 2) - 18)
-        weekly_rect = pygame.Rect(box.x + 12, box.y + box.h // 2 + 6, box.w - 24, (box.h // 2) - 18)
-
-        draw_text(self.screen, self.font_shop_item, f"DAILY  •  Resets in {self.time_until_reset('daily')}", (daily_rect.x, daily_rect.y - 2), C_TEXT, shadow=False)
-        draw_text(self.screen, self.font_shop_item, f"WEEKLY  •  Resets in {self.time_until_reset('weekly')}", (weekly_rect.x, weekly_rect.y - 2), C_TEXT, shadow=False)
+        list_rect = pygame.Rect(box.x + 16, box.y + 32, box.w - 32, box.h - 48)
+        reset_label = f"Resets in {self.time_until_reset(self.challenges_view)}"
+        header = "DAILY" if self.challenges_view == "daily" else "WEEKLY"
+        draw_text(self.screen, self.font_shop_item, f"{header}  •  {reset_label}", (list_rect.x, box.y + 10), C_TEXT, shadow=False)
 
         def draw_list(items, rect):
             if not items:
@@ -3420,7 +3467,7 @@ class Game:
                 return
             row_h = 64
             gap = 10
-            y = rect.y + 22
+            y = rect.y + 8
             for item in items:
                 row = pygame.Rect(rect.x, y, rect.w, row_h)
                 y += row_h + gap
@@ -3451,16 +3498,34 @@ class Game:
                 fill_w = int(bar_w * clamp(progress / max(1, target), 0, 1))
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, fill_w, bar_h), border_radius=6)
 
-        draw_list(self.save.daily_challenges.get("items", []), daily_rect)
-        draw_list(self.save.weekly_challenges.get("items", []), weekly_rect)
+        items = list(self.save.daily_challenges.get("items", [])) if self.challenges_view == "daily" else list(self.save.weekly_challenges.get("items", []))
+        row_h = 64
+        gap = 10
+        rows_per_page = max(1, (list_rect.h + gap) // (row_h + gap))
+        total_pages = max(1, math.ceil(len(items) / rows_per_page))
+        self.challenges_page = int(clamp(self.challenges_page, 0, total_pages - 1))
+        start = self.challenges_page * rows_per_page
+        end = start + rows_per_page
+        draw_list(items[start:end], list_rect)
 
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+        if self.challenges_prev_btn and self.challenges_next_btn:
+            self.challenges_prev_btn.enabled = self.challenges_page > 0
+            self.challenges_next_btn.enabled = (self.challenges_page + 1) < total_pages
+            self.challenges_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.challenges_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.challenges_prev_btn.draw(self.screen, self.font_med)
+            self.challenges_next_btn.draw(self.screen, self.font_med)
+
+            page_txt = f"Page {self.challenges_page + 1}/{total_pages}"
+            mid_x = (self.challenges_prev_btn.rect.centerx + self.challenges_next_btn.rect.centerx) // 2
+            below_y = self.challenges_prev_btn.rect.bottom + 10
+            draw_text(self.screen, self.font_small, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
+
         if self.challenges_back_btn:
             self.challenges_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
             self.challenges_back_btn.draw(self.screen, self.font_med)
 
-    def draw_weapon_mastery(self, box: pygame.Rect, mouse_pos, mouse_down, events):
+    def draw_weapon_mastery(self, box: pygame.Rect, mouse_pos, mouse_down, events) -> int:
         cols = 2
         rows = 3
         gap_x = 12
@@ -3497,7 +3562,9 @@ class Game:
                 card_h
             )
 
-            stats = self.save.weapon_mastery.get(wid, {"kills": 0, "hits": 0, "games": 0, "level": 0})
+            stats, changed = self.save.ensure_mastery_entry(wid)
+            if changed:
+                self.save.save()
             level = int(stats.get("level", 0))
             kills = int(stats.get("kills", 0))
             hits = int(stats.get("hits", 0))
@@ -3535,6 +3602,8 @@ class Game:
                 draw_text(self.screen, self.font_tiny, f"Games {games}/{req_games}", (bar_x, bar_y2 - 14), C_TEXT_DIM, shadow=False)
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y2, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT_2, pygame.Rect(bar_x, bar_y2, int(bar_w * game_frac), bar_h), border_radius=6)
+
+        return total_pages
     def draw_weapons(self, events):
         self.screen.fill(C_BG)
         cx = WIDTH // 2
@@ -3559,7 +3628,15 @@ class Game:
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
         if self.weapons_view == "mastery":
-            self.draw_weapon_mastery(box, mouse_pos, mouse_down, events)
+            try:
+                total_pages = self.draw_weapon_mastery(box, mouse_pos, mouse_down, events)
+            except Exception:
+                if not self.mastery_error_logged:
+                    print("Mastery tab error:")
+                    traceback.print_exc()
+                    self.mastery_error_logged = True
+                total_pages = 1
+                draw_text(self.screen, self.font_med, "Mastery data unavailable.", (cx, box.centery), C_TEXT_DIM, center=True, shadow=False)
         else:
             cols = 3
             rows = 3  # ✅ force 3 rows => 9 cards per page
