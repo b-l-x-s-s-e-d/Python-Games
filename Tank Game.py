@@ -214,6 +214,20 @@ def draw_text(surf, font, text, pos, color=C_TEXT, center=False, shadow=True):
     return r
 
 
+def clamp_text(font, text, max_width):
+    if font.size(text)[0] <= max_width:
+        return text
+    ellipsis = "..."
+    ellipsis_w = font.size(ellipsis)[0]
+    if ellipsis_w >= max_width:
+        return ellipsis
+    trimmed = text
+    target_w = max_width - ellipsis_w
+    while trimmed and font.size(trimmed)[0] > target_w:
+        trimmed = trimmed[:-1]
+    return f"{trimmed}{ellipsis}"
+
+
 def circle_outline(surf, color, pos, radius, width=2):
     pygame.draw.circle(surf, color, (int(pos[0]), int(pos[1])), int(radius), int(width))
 
@@ -3546,25 +3560,29 @@ class Game:
                 self.save.save()
             level = int(stats.get("level", 0))
             kills = int(stats.get("kills", 0))
-            hits = int(stats.get("hits", 0))
             games = int(stats.get("games", 0))
+            req_level = min(level + 1, MAX_MASTERY_LEVEL)
+            req_kills, req_games = mastery_requirements(req_level)
 
             pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=14)
             pygame.draw.rect(self.screen, C_WALL_EDGE, rect, 2, border_radius=14)
 
             wdef = WEAPONS[wid]
-            draw_text(self.screen, self.font_shop_item, wdef.name, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
-            draw_text(self.screen, self.font_shop_small, f"Mastery Lv. {level}", (rect.x + 14, rect.y + 38), C_ACCENT, shadow=False)
+            max_text_w = rect.w - 28
+            weapon_name = clamp_text(self.font_shop_item, wdef.name, max_text_w)
+            mastery_label = clamp_text(self.font_shop_small, f"Mastery Lv. {level}", max_text_w)
+            draw_text(self.screen, self.font_shop_item, weapon_name, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
+            draw_text(self.screen, self.font_shop_small, mastery_label, (rect.x + 14, rect.y + 38), C_ACCENT, shadow=False)
 
             stats_lines = [
-                f"Kills: {kills}",
-                f"Hits: {hits}",
-                f"Games: {games}",
+                f"Kills: {kills} / {req_kills}",
+                f"Games: {games} / {req_games}",
             ]
             stats_y = rect.y + 62
-            stats_gap = 16
+            stats_gap = 20
             for line in stats_lines:
-                draw_text(self.screen, self.font_tiny, line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
+                clamped_line = clamp_text(self.font_tiny, line, max_text_w)
+                draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
                 stats_y += stats_gap
 
             bar_w = rect.w - 28
@@ -3573,20 +3591,16 @@ class Game:
             bar_y = rect.y + rect.h - 34
 
             if level >= MAX_MASTERY_LEVEL:
-                draw_text(self.screen, self.font_shop_small, "MASTERED", (rect.right - 110, rect.y + 10), C_OK, shadow=False)
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_OK, pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
             else:
-                req_kills, req_games = mastery_requirements(level + 1)
                 kill_frac = clamp(kills / max(1, req_kills), 0, 1)
                 game_frac = clamp(games / max(1, req_games), 0, 1)
 
-                draw_text(self.screen, self.font_tiny, f"Kills {kills}/{req_kills}", (bar_x, bar_y - 14), C_TEXT_DIM, shadow=False)
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, int(bar_w * kill_frac), bar_h), border_radius=6)
 
                 bar_y2 = bar_y + 16
-                draw_text(self.screen, self.font_tiny, f"Games {games}/{req_games}", (bar_x, bar_y2 - 14), C_TEXT_DIM, shadow=False)
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y2, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT_2, pygame.Rect(bar_x, bar_y2, int(bar_w * game_frac), bar_h), border_radius=6)
 
@@ -3599,7 +3613,7 @@ class Game:
         self.weapon_notice_timer = max(0.0, self.weapon_notice_timer - (1 / 60))
 
         draw_text(self.screen, self.font_shop_title, "WEAPONS", (cx, 62), C_TEXT, center=True)
-        subtitle = "Pick an unlocked troop (buy more in Shop → WEAPONS)." if self.weapons_view == "weapons" else "Mastery is visual only (no bonuses yet)."
+        subtitle = "Pick an unlocked troop (buy more in Shop → WEAPONS)." if self.weapons_view == "weapons" else "Mastery tracks each weapon's usage and progression over time."
         draw_text(self.screen, self.font_ui, subtitle,
                   (cx, 94), C_TEXT_DIM, center=True, shadow=False)
 
@@ -3747,7 +3761,11 @@ class Game:
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
         if self.shop_tab == "cosmetics":
-            cosmetic_box = pygame.Rect(70, 175, WIDTH - 140, HEIGHT - 330)
+            controls_top = min(self.shop_prev_btn.rect.top, self.shop_back_btn.rect.top)
+            options_box_h = 86
+            options_box_y = controls_top - options_box_h - 14
+            list_bottom = options_box_y - 12
+            cosmetic_box = pygame.Rect(70, 175, WIDTH - 140, list_bottom - 175)
             pygame.draw.rect(self.screen, (*C_PANEL, 235), cosmetic_box, border_radius=16)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), cosmetic_box, 2, border_radius=16)
 
@@ -3803,7 +3821,7 @@ class Game:
                     btn.update(1 / 60, mouse_pos, mouse_down, events)
                     btn.draw(self.screen, self.font_shop_small)
 
-            options_box = pygame.Rect(70, cosmetic_box.bottom + 12, WIDTH - 140, 86)
+            options_box = pygame.Rect(70, options_box_y, WIDTH - 140, options_box_h)
             pygame.draw.rect(self.screen, (*C_PANEL, 235), options_box, border_radius=14)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), options_box, 2, border_radius=14)
             draw_text(self.screen, self.font_shop_small, "OPTIONS", (options_box.x + 14, options_box.y + 10), C_TEXT_DIM, shadow=False)
