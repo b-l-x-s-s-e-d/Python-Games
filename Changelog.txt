@@ -49,9 +49,9 @@ Improvements
 
 v1.3
 New Features
-1. Added "Flamethrower" Tank
-2. Added "Omni Pistol" Tank
-3. Added "Auto-Fire" and a visual representation
+1. Added Flamethrower Tank
+2. Added Omni Pistol Tank
+3. Added Auto-Fire and a visual representation
 4. Added a Boss tracker that points towards the Boss (if applicable)
 
 
@@ -66,7 +66,7 @@ Improvements
 
 v1.3.1
 New Features
-1. Added "Windscreen Wiper" as an exclusive, limited, and OP Tank
+1. Added Windscreen Wiper as an exclusive, limited, and OP Tank
 
 Improvements
 1. Decreased Heal Orb heal from 2hp -> 1hp
@@ -81,7 +81,7 @@ Improvements
 
 v1.3.2
 New Features
-1. Added a "Tank" tank
+1. Added a Tank tank
 2. You can now crit enemies without an upgrade
 Improvements
 1. Increased/fixed recoil on all tanks
@@ -97,7 +97,7 @@ Improvements
 
 v1.3.4
 New Features
-1. Added a "Leaderboard" tab on the main menu, displaying players' top 10 runs
+1. Added a Leaderboard tab on the main menu, displaying players' top 10 runs
 Bug Fixes
 1. Fixed a bug where piercing would not work properly on the rocket and tank
 2. Fixed a bug where the game would crash upon opening
@@ -115,10 +115,11 @@ To-Do Features
 New Features
 1. Enable fullscreen mode.
 2. Add a “Story Mode” featuring level-based progression similar to Geometry Dash or Mario.
-3. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
+3. Add a Kill Streak that gives extra rewards if you attack enemies without taking damage
 4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
-2. Fix UI for 
+2. Fix UI for the Challenges tab, as the Challenges are overlapping
 Bug Fixes
-1. 
+1. Fix the crash when opening the Mastery tab
+
