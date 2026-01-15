@@ -2056,9 +2056,9 @@ class Game:
         rng = random.Random(key)
         weapon_ids = list(WEAPONS.keys())
         candidates = [
-            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 40, "metric": "kills"},
-            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 25, "metric": "waves"},
-            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 15, "metric": "runs"},
+            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 30, "metric": "kills"},
+            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 15, "metric": "waves"},
+            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 10, "metric": "runs"},
         ]
         weapon_pick = rng.choice(weapon_ids)
         weapon_name = WEAPONS[weapon_pick].name
@@ -2085,7 +2085,7 @@ class Game:
     def _generate_weekly_challenges(self, key: str) -> List[Dict[str, object]]:
         rng = random.Random(key)
         candidates = [
-            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 3 bosses.", "target": 3, "reward": 120, "metric": "boss_kills"},
+            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 3 bosses.", "target": 3, "reward": 140, "metric": "boss_kills"},
             {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 9000 total damage.", "target": 9000, "reward": 130, "metric": "damage"},
             {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 20.", "target": 20, "reward": 150, "metric": "high_wave"},
             {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 8 runs.", "target": 8, "reward": 100, "metric": "runs"},
@@ -4208,4 +4208,5 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
 
