@@ -2056,7 +2056,7 @@ class Game:
         rng = random.Random(key)
         weapon_ids = list(WEAPONS.keys())
         candidates = [
-            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 30, "metric": "kills"},
+            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 25, "metric": "kills"},
             {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 15, "metric": "waves"},
             {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 10, "metric": "runs"},
         ]
@@ -4208,5 +4208,6 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
 
 
