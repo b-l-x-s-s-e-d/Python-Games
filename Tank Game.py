@@ -3591,8 +3591,8 @@ class Game:
                 f"Kills: {kills} / {req_kills}",
                 f"Games: {games} / {req_games}",
             ]
-            stats_y = rect.y + 52
-            stats_gap = self.font_tiny.get_height() + 8
+            stats_y = rect.y + 44
+            stats_gap = self.font_tiny.get_height() + 17
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
@@ -3601,7 +3601,7 @@ class Game:
             bar_w = rect.w - 28
             bar_h = 10
             bar_x = rect.x + 14
-            bar_y = rect.y + rect.h - 38
+            bar_y = rect.y + rect.h - 54
 
             if level >= MAX_MASTERY_LEVEL:
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
@@ -3613,7 +3613,7 @@ class Game:
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, int(bar_w * kill_frac), bar_h), border_radius=6)
 
-                bar_y2 = bar_y + 16
+                bar_y2 = bar_y + 29
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y2, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT_2, pygame.Rect(bar_x, bar_y2, int(bar_w * game_frac), bar_h), border_radius=6)
 
@@ -4167,4 +4167,3 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
-
