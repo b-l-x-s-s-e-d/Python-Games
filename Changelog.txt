@@ -1,48 +1,74 @@
 TANK GAME CHANGELOG
 
 v1.1
+New Features
 1. Added new tanks
 2. Added new shop items
-3. Fixed bug where enemies would get stuck inside the player
+Bug Fixes
+1. Fixed bug where enemies would get stuck inside the player
+
 
 v1.2
+New Features
+1. Added Chainsaw tank
+Improvements
 1. Balanced difficulty scaling
-2. Added Chainsaw tank
+
 
 v1.2.1
-1. Fixed the game not opening properly 
-2. Fixed shop UI
+Improvements
+1. Improved shop UI
+Bug Fixes
+1. Fixed the game not opening properly
+
 
 v1.2.2
+Bug Fixes
 1. Fixed not being able to equip certain tanks
 2. Fixed a typo in the code
 
+
 v1.2.3
+New Features
+1. Imported the old version of the game due to the new version having fewer features :3
+Bug Fixes
 1. Fixed an annoying bug where the game would crash upon opening
-2. Imported the old version of the game due to the new version having fewer features :3
+
 
 v1.2.4
+New Features
+1. Working on a BIG update :3
+Improvements
 1. Ranged enemy damage decreased from 3hp -> 2hp. And hard mode from 7hp -> 3hp
-2. Increased grace time after killing bthe oss from 2.5 -> 3
+2. Increased grace time after killing the boss from 2.5 -> 3
 3. Difficulty ramp time decreased
 4. Increased all powerup durations
 5. Max enemy limit decreased
 6. Increased coins-per-wave from 2 -> 4
-7. Working on a BIG update :3
+
 
 v1.3
+New Features
+1. Added "Flamethrower" Tank
+2. Added "Omni Pistol" Tank
+3. Added "Auto-Fire" and a visual representation
+4. Added a Boss tracker that points towards the Boss (if applicable)
+
+
+Improvements
 1. Increased Sniper bullet speed from 1450 -> 1500
 2. Decreased Sniper bullet radius from 4 -> 3
-3. Added "Flamethrower" Tank 
-4. Added "Omni Pistol" Tank
-5. Added "Auto-Fire" and a visual representation
-6. Each wave lasts 13 seconds instead of 18
-7. Changed Boss's default damage from 6hp -> 2hp
-8. Changed Boss's bullet speed from 420 -> 310
-9. Added a Boss tracker that points towards the Boss (if applicable)
-10. Reduced Tesla fire cooldown from 0.22 -> 0.21
+3. Each wave lasts 13 seconds instead of 18
+4. Changed Boss's default damage from 6hp -> 2hp
+5. Changed Boss's bullet speed from 420 -> 310
+6. Reduced Tesla fire cooldown from 0.22 -> 0.21
+
 
 v1.3.1
+New Features
+1. Added "Windscreen Wiper" as an exclusive, limited, and OP Tank
+
+Improvements
 1. Decreased Heal Orb heal from 2hp -> 1hp
 2. Decreased Omni Pistol damage from 11 -> 8
 3. Increased wave time from 13 -> 15
@@ -51,45 +77,48 @@ v1.3.1
 6. Improved Powerup tracker
 7. Improved Boss death loot
 8. Increased Flamethrower bullet life from 0.35 -> 0.45
-9. Added "Windscreen Wiper" as an exclusive, limited, and OP Tank
+
 
 v1.3.2
+New Features
 1. Added a "Tank" tank
 2. You can now crit enemies without an upgrade
-3. Increased/fixed recoil on all tanks
-4. Increased Tank damage from 52hp -> 56hp
-5. Decreased Tank fire cooldown from 1.65 -> 1.5
+Improvements
+1. Increased/fixed recoil on all tanks
+2. Increased Tank damage from 52hp -> 56hp
+3. Decreased Tank fire cooldown from 1.65 -> 1.5
+
 
 v1.3.3
+Improvements
 1. Decreased Boss default damage from 2hp -> 1hp
 2. Decreased Boss bullet speed from 310 -> 270
 
+
 v1.3.4
+New Features
 1. Added a "Leaderboard" tab on the main menu, displaying players' top 10 runs
-2. Fixed a bug where piercing would not work properly on the rocket and tank
-3. Fixed a bug where the game would crash upon opening
+Bug Fixes
+1. Fixed a bug where piercing would not work properly on the rocket and tank
+2. Fixed a bug where the game would crash upon opening
+
 
 v1.4
 New Features
-1. Added a new Shop tab for Bundles with discounted one-time packs
-2. Expanded Cosmetics with outline styles, bullet colors, trails, and explosion styles (including bundle exclusives)
-3. Added Daily + Weekly Challenges with automatic resets and instant coin rewards
-4. Added a Weapon Mastery view that tracks kills, hits, games, and mastery levels
+1. Added a new Shop tab for Bundles
+2. Expanded Cosmetics with explosion styles, bullet colour, and more
+3. Added Daily and Weekly Challenges
+4. Added a Weapon Mastery tab
 
-Improvements
-1. Weapons screen now includes a Mastery toggle without adding new menu clutter
-2. Main menu now includes a compact Challenges shortcut
 
-Internal / Prep
-1. Save data extended for bundles, cosmetics, challenges, and weapon mastery
-
-To-Do Features:
+To-Do Features
+New Features
 1. Enable fullscreen mode.
-4. Redesign the main menu title and the weapon/coins panel for improved presentation.
-5. Add a “Story Mode” featuring level‑based progression similar to Geometry Dash or Mario.
-6. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
-7. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
-
-
-
-
+2. Add a “Story Mode” featuring level-based progression similar to Geometry Dash or Mario.
+3. Add a "Kill Streak" that gives extra rewards if you attack enemies without taking damage
+4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
+Improvements
+1. Redesign the main menu title and the weapon/coins panel for improved presentation.
+2. Fix UI for 
+Bug Fixes
+1. 
