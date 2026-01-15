@@ -3591,8 +3591,8 @@ class Game:
                 f"Kills: {kills} / {req_kills}",
                 f"Games: {games} / {req_games}",
             ]
-            stats_y = rect.y + 60
-            stats_gap = 24
+            stats_y = rect.y + 52
+            stats_gap = self.font_tiny.get_height() + 8
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
