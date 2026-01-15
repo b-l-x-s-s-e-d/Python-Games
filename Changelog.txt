@@ -111,6 +111,12 @@ New Features
 4. Added a Weapon Mastery tab
 
 
+v1.4.1
+Improvements
+1. Fixed the Mastery tab from crashing upon opening
+2. Added 2 separate tabs for Daily and Weekly Challenges
+
+
 To-Do Features
 New Features
 1. Enable fullscreen mode.
@@ -122,4 +128,5 @@ Improvements
 2. Fix UI for the Challenges tab, as the Challenges are overlapping
 Bug Fixes
 1. Fix the crash when opening the Mastery tab
+
 
