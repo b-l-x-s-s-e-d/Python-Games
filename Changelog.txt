@@ -126,7 +126,9 @@ New Features
 Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
 2. Fix UI for the Challenges tab, as the Challenges are overlapping
+3. Redo some subtitles to make them give more context on the tab. Example: Mastery Tab - make the subtitle explain what it is more rather than saying "Only visual"
 Bug Fixes
-1. Fix the crash when opening the Mastery tab
+1.
+
 
 
