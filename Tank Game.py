@@ -392,10 +392,32 @@ class SaveManager:
             self.weapon_mastery[weapon_id] = {}
             changed = True
         stats = self.weapon_mastery[weapon_id]
-        for key in ("kills", "hits", "games", "level"):
-            if key not in stats:
-                stats[key] = 0
-                changed = True
+        if "level" not in stats:
+            stats["level"] = 0
+            changed = True
+        if "hits" not in stats:
+            stats["hits"] = 0
+            changed = True
+        if "total_kills" not in stats:
+            stats["total_kills"] = int(stats.get("kills", 0))
+            changed = True
+        if "total_wins" not in stats:
+            stats["total_wins"] = int(stats.get("games", 0))
+            changed = True
+        if "level_kills" not in stats:
+            stats["level_kills"] = 0
+            changed = True
+        if "level_wins" not in stats:
+            stats["level_wins"] = 0
+            changed = True
+        req_level = min(int(stats.get("level", 0)) + 1, MAX_MASTERY_LEVEL)
+        req_kills, req_wins = mastery_requirements(req_level)
+        if "req_kills" not in stats:
+            stats["req_kills"] = req_kills
+            changed = True
+        if "req_wins" not in stats:
+            stats["req_wins"] = req_wins
+            changed = True
         return stats, changed
 
     def load(self):
@@ -1696,6 +1718,7 @@ class Game:
         self.progress_dirty = False
         self.progress_dirty_timer = 0.0
         self.trail_timer = 0.0
+        self.counted_game = False
 
         self.last_run_coins_earned = 0
         self.coins_awarded_this_gameover = False
@@ -2117,24 +2140,35 @@ class Game:
         return f"{hours}h {minutes}m"
 
     # ---------------- Mastery ----------------
-    def update_mastery(self, weapon_id: str, hits: int = 0, kills: int = 0, games: int = 0):
+    def update_mastery(self, weapon_id: str, hits: int = 0, kills: int = 0, wins: int = 0):
         if weapon_id not in WEAPONS:
             return
         stats, changed = self.save.ensure_mastery_entry(weapon_id)
         if changed:
             self.save.save()
         stats["hits"] = int(stats.get("hits", 0)) + hits
-        stats["kills"] = int(stats.get("kills", 0)) + kills
-        stats["games"] = int(stats.get("games", 0)) + games
+        stats["total_kills"] = int(stats.get("total_kills", 0)) + kills
+        stats["total_wins"] = int(stats.get("total_wins", 0)) + wins
+
+        if stats.get("level", 0) < MAX_MASTERY_LEVEL:
+            stats["level_kills"] = int(stats.get("level_kills", 0)) + kills
+            stats["level_wins"] = int(stats.get("level_wins", 0)) + wins
+
         leveled = False
-        while stats.get("level", 0) < MAX_MASTERY_LEVEL:
-            next_level = stats["level"] + 1
-            req_kills, req_games = mastery_requirements(next_level)
-            if stats["kills"] >= req_kills and stats["games"] >= req_games:
-                stats["level"] = next_level
+        level = int(stats.get("level", 0))
+        if level < MAX_MASTERY_LEVEL:
+            req_kills, req_wins = mastery_requirements(level + 1)
+            stats["req_kills"] = req_kills
+            stats["req_wins"] = req_wins
+            if stats["level_kills"] >= req_kills and stats["level_wins"] >= req_wins:
+                stats["level"] = level + 1
+                stats["level_kills"] = 0
+                stats["level_wins"] = 0
                 leveled = True
-            else:
-                break
+                if stats["level"] < MAX_MASTERY_LEVEL:
+                    next_req_kills, next_req_wins = mastery_requirements(stats["level"] + 1)
+                    stats["req_kills"] = next_req_kills
+                    stats["req_wins"] = next_req_wins
         if leveled:
             self.float_texts.append(FloatingText(self.player.pos + Vector2(0, -50), f"{WEAPONS[weapon_id].name} Mastery +1", C_ACCENT))
         self.progress_dirty = True
@@ -2238,7 +2272,7 @@ class Game:
 
         self.player = Player(Vector2(ARENA_W / 2, ARENA_H / 2), weapon_id=weapon_id)
         self.apply_meta_upgrades_to_player()
-        self.update_mastery(weapon_id, games=1)
+        self.counted_game = False
 
         self.projectiles.clear()
         self.enemy_projectiles.clear()
@@ -2712,6 +2746,10 @@ class Game:
                 self.wave_timer = WAVE_TIME_BASE
                 self.update_challenges("waves", 1)
                 self.update_challenges("high_wave", self.wave, absolute=True)
+
+                if self.wave == 3 and not self.counted_game:
+                    self.update_mastery(self.player.weapon_id, wins=1)
+                    self.counted_game = True
 
                 if self.wave % BOSS_EVERY_WAVES == 0:
                     self.spawn_boss()
@@ -3566,10 +3604,13 @@ class Game:
             if changed:
                 self.save.save()
             level = int(stats.get("level", 0))
-            kills = int(stats.get("kills", 0))
-            games = int(stats.get("games", 0))
+            level_kills = int(stats.get("level_kills", 0))
+            level_wins = int(stats.get("level_wins", 0))
+            total_kills = int(stats.get("total_kills", stats.get("kills", 0)))
+            total_wins = int(stats.get("total_wins", stats.get("games", 0)))
             req_level = min(level + 1, MAX_MASTERY_LEVEL)
-            req_kills, req_games = mastery_requirements(req_level)
+            req_kills = int(stats.get("req_kills", mastery_requirements(req_level)[0]))
+            req_wins = int(stats.get("req_wins", mastery_requirements(req_level)[1]))
 
             pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=14)
             pygame.draw.rect(self.screen, C_WALL_EDGE, rect, 2, border_radius=14)
@@ -3588,11 +3629,13 @@ class Game:
             draw_text(self.screen, self.font_shop_small, mastery_label, (mastery_x, mastery_y), C_ACCENT, shadow=False)
 
             stats_lines = [
-                f"Kills: {kills} / {req_kills}",
-                f"Games: {games} / {req_games}",
+                f"Level Kills: {min(level_kills, req_kills)} / {req_kills}",
+                f"Level Wins: {min(level_wins, req_wins)} / {req_wins}",
+                f"Total Kills: {total_kills}",
+                f"Total Wins: {total_wins}",
             ]
             stats_y = rect.y + 44
-            stats_gap = self.font_tiny.get_height() + 17
+            stats_gap = self.font_tiny.get_height() + 6
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
@@ -3607,8 +3650,8 @@ class Game:
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_OK, pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
             else:
-                kill_frac = clamp(kills / max(1, req_kills), 0, 1)
-                game_frac = clamp(games / max(1, req_games), 0, 1)
+                kill_frac = clamp(level_kills / max(1, req_kills), 0, 1)
+                game_frac = clamp(level_wins / max(1, req_wins), 0, 1)
 
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, int(bar_w * kill_frac), bar_h), border_radius=6)
