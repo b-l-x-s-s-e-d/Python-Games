@@ -116,7 +116,13 @@ Improvements
 2. Added 2 separate tabs for Daily and Weekly Challenges
 3. Fully fixed the UIs for the Challenges tab and the Cosmetics tab
 4. Rewrote the subtitle in the Mastery tab
-5. Fully fixed the Challenges and Mastery tab UIs
+
+
+v1.4.2
+Imrpovements
+1. Fully fixed the Challenges and Mastery tab UIs
+2. Added a feature where you need to be at Wave 3 for it to be counted as a "Game Played" for Mastery
+3. Mastery adjustments
 
 
 To-Do Features
@@ -130,3 +136,4 @@ Improvements
 2. Fix UI for the Mastery tab
 Bug Fixes
 1.
+
