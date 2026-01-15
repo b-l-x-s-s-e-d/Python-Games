@@ -123,6 +123,7 @@ Imrpovements
 1. Fully fixed the Challenges and Mastery tab UIs
 2. Added a feature where you need to be at Wave 3 for it to be counted as a "Game Played" for Mastery
 3. Mastery adjustments
+4. Working on adding Story Mode into the game :3
 
 
 To-Do Features
@@ -136,4 +137,5 @@ Improvements
 2. Fix UI for the Mastery tab
 Bug Fixes
 1.
+
 
