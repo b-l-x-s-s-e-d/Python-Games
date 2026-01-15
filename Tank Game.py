@@ -398,6 +398,12 @@ class SaveManager:
         if "hits" not in stats:
             stats["hits"] = 0
             changed = True
+        codex/fix-mastery-tracking-and-ui-updates-1sahww
+        if "level_kills" not in stats:
+            stats["level_kills"] = min(int(stats.get("kills", 0)), mastery_requirements(int(stats.get("level", 0)) + 1)[0])
+            changed = True
+        if "level_wins" not in stats:
+            stats["level_wins"] = min(int(stats.get("games", 0)), mastery_requirements(int(stats.get("level", 0)) + 1)[1])
         if "total_kills" not in stats:
             stats["total_kills"] = int(stats.get("kills", 0))
             changed = True
@@ -409,6 +415,7 @@ class SaveManager:
             changed = True
         if "level_wins" not in stats:
             stats["level_wins"] = 0
+        main
             changed = True
         req_level = min(int(stats.get("level", 0)) + 1, MAX_MASTERY_LEVEL)
         req_kills, req_wins = mastery_requirements(req_level)
@@ -2147,9 +2154,12 @@ class Game:
         if changed:
             self.save.save()
         stats["hits"] = int(stats.get("hits", 0)) + hits
+        codex/fix-mastery-tracking-and-ui-updates-1sahww
+
         stats["total_kills"] = int(stats.get("total_kills", 0)) + kills
         stats["total_wins"] = int(stats.get("total_wins", 0)) + wins
 
+        main
         if stats.get("level", 0) < MAX_MASTERY_LEVEL:
             stats["level_kills"] = int(stats.get("level_kills", 0)) + kills
             stats["level_wins"] = int(stats.get("level_wins", 0)) + wins
@@ -3606,8 +3616,11 @@ class Game:
             level = int(stats.get("level", 0))
             level_kills = int(stats.get("level_kills", 0))
             level_wins = int(stats.get("level_wins", 0))
+        codex/fix-mastery-tracking-and-ui-updates-1sahww
+
             total_kills = int(stats.get("total_kills", stats.get("kills", 0)))
             total_wins = int(stats.get("total_wins", stats.get("games", 0)))
+        main
             req_level = min(level + 1, MAX_MASTERY_LEVEL)
             req_kills = int(stats.get("req_kills", mastery_requirements(req_level)[0]))
             req_wins = int(stats.get("req_wins", mastery_requirements(req_level)[1]))
@@ -3629,13 +3642,11 @@ class Game:
             draw_text(self.screen, self.font_shop_small, mastery_label, (mastery_x, mastery_y), C_ACCENT, shadow=False)
 
             stats_lines = [
-                f"Level Kills: {min(level_kills, req_kills)} / {req_kills}",
-                f"Level Wins: {min(level_wins, req_wins)} / {req_wins}",
-                f"Total Kills: {total_kills}",
-                f"Total Wins: {total_wins}",
+                f"Kills: {min(level_kills, req_kills)} / {req_kills}",
+                f"Games: {min(level_wins, req_wins)} / {req_wins}",
             ]
             stats_y = rect.y + 44
-            stats_gap = self.font_tiny.get_height() + 6
+            stats_gap = self.font_tiny.get_height() + 17
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
