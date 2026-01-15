@@ -3629,11 +3629,11 @@ class Game:
             draw_text(self.screen, self.font_shop_small, mastery_label, (mastery_x, mastery_y), C_ACCENT, shadow=False)
 
             stats_lines = [
-                f"Level Kills: {min(level_kills, req_kills)} / {req_kills}",
-                f"Level Wins: {min(level_wins, req_wins)} / {req_wins}",
+                f"Kills: {min(level_kills, req_kills)} / {req_kills}",
+                f"Wins: {min(level_wins, req_wins)} / {req_wins}",
             ]
             stats_y = rect.y + 44
-            stats_gap = self.font_tiny.get_height() + 12
+            stats_gap = self.font_tiny.get_height() + 14
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
@@ -3654,7 +3654,7 @@ class Game:
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, int(bar_w * kill_frac), bar_h), border_radius=6)
 
-                bar_y2 = bar_y + 29
+                bar_y2 = bar_y + 31
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y2, bar_w, bar_h), border_radius=6)
                 pygame.draw.rect(self.screen, C_ACCENT_2, pygame.Rect(bar_x, bar_y2, int(bar_w * game_frac), bar_h), border_radius=6)
 
