@@ -1657,10 +1657,7 @@ class Game:
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
         self.challenges_back_btn: Optional[Button] = None
-        self.challenges_next_btn: Optional[Button] = None
-        self.challenges_prev_btn: Optional[Button] = None
         self.challenges_view = "daily"
-        self.challenges_page = 0
         self.challenge_tabs: List[TabButton] = []
         self.pause_buttons: List[Button] = []
         self.gameover_buttons: List[Button] = []
@@ -1769,8 +1766,6 @@ class Game:
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
-        self.challenges_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_challenges_page(-1))
-        self.challenges_next_btn = Button(pygame.Rect(WIDTH - 170, HEIGHT - 80, 120, 52), "Next", lambda: self.change_challenges_page(1))
 
         # Weapons pagination buttons (bottom-right)
         self.weapon_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_weapon_page(-1))
@@ -1824,7 +1819,7 @@ class Game:
         ]
 
         # Challenges tabs
-        ctab_y = 124
+        ctab_y = 168
         ctab_w = 200
         ctab_h = 40
         ctab_gap = 14
@@ -1832,7 +1827,6 @@ class Game:
 
         def set_challenges_view(view: str):
             self.challenges_view = view
-            self.challenges_page = 0
 
         self.challenge_tabs = [
             TabButton(pygame.Rect(ctab_start_x, ctab_y, ctab_w, ctab_h), "DAILY", set_challenges_view, "daily"),
@@ -1873,11 +1867,7 @@ class Game:
 
     def open_challenges(self):
         self.challenges_view = "daily"
-        self.challenges_page = 0
         self.set_state("challenges")
-
-    def change_challenges_page(self, delta: int):
-        self.challenges_page = max(0, self.challenges_page + delta)
 
     # ---------------- Cosmetics ----------------
     def get_cosmetic(self, cosmetic_id: str) -> Optional[CosmeticDef]:
@@ -3441,18 +3431,27 @@ class Game:
         self.refresh_challenges()
         cx = WIDTH // 2
 
-        draw_text(self.screen, self.font_big, "CHALLENGES", (cx, 92), C_TEXT, center=True)
+        title_y = 92
+        subtitle_y = 128
+        tab_y = subtitle_y + 32
+        tab_gap = 18
+
+        draw_text(self.screen, self.font_big, "CHALLENGES", (cx, title_y), C_TEXT, center=True)
         subtitle = "Daily goals reset automatically" if self.challenges_view == "daily" else "Weekly goals reset automatically"
-        draw_text(self.screen, self.font_ui, subtitle, (cx, 128), C_TEXT_DIM, center=True, shadow=False)
+        draw_text(self.screen, self.font_ui, subtitle, (cx, subtitle_y), C_TEXT_DIM, center=True, shadow=False)
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
 
+        tab_h = self.challenge_tabs[0].rect.height if self.challenge_tabs else 0
         for tab in self.challenge_tabs:
+            tab.rect.y = tab_y
             tab.update(mouse_pos, mouse_down)
             tab.draw(self.screen, self.font_shop_item, active=(tab.tab_id == self.challenges_view))
 
-        box = pygame.Rect(120, 190, WIDTH - 240, HEIGHT - 300)
+        box_y = tab_y + tab_h + tab_gap
+        box_bottom = HEIGHT - 110
+        box = pygame.Rect(120, box_y, WIDTH - 240, box_bottom - box_y)
         pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
@@ -3499,27 +3498,7 @@ class Game:
                 pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, fill_w, bar_h), border_radius=6)
 
         items = list(self.save.daily_challenges.get("items", [])) if self.challenges_view == "daily" else list(self.save.weekly_challenges.get("items", []))
-        row_h = 64
-        gap = 10
-        rows_per_page = max(1, (list_rect.h + gap) // (row_h + gap))
-        total_pages = max(1, math.ceil(len(items) / rows_per_page))
-        self.challenges_page = int(clamp(self.challenges_page, 0, total_pages - 1))
-        start = self.challenges_page * rows_per_page
-        end = start + rows_per_page
-        draw_list(items[start:end], list_rect)
-
-        if self.challenges_prev_btn and self.challenges_next_btn:
-            self.challenges_prev_btn.enabled = self.challenges_page > 0
-            self.challenges_next_btn.enabled = (self.challenges_page + 1) < total_pages
-            self.challenges_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.challenges_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.challenges_prev_btn.draw(self.screen, self.font_med)
-            self.challenges_next_btn.draw(self.screen, self.font_med)
-
-            page_txt = f"Page {self.challenges_page + 1}/{total_pages}"
-            mid_x = (self.challenges_prev_btn.rect.centerx + self.challenges_next_btn.rect.centerx) // 2
-            below_y = self.challenges_prev_btn.rect.bottom + 10
-            draw_text(self.screen, self.font_small, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
+        draw_list(items, list_rect)
 
         if self.challenges_back_btn:
             self.challenges_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
@@ -3577,8 +3556,16 @@ class Game:
             draw_text(self.screen, self.font_shop_item, wdef.name, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
             draw_text(self.screen, self.font_shop_small, f"Mastery Lv. {level}", (rect.x + 14, rect.y + 38), C_ACCENT, shadow=False)
 
-            stats_line = f"Kills {kills}  •  Hits {hits}  •  Games {games}"
-            draw_text(self.screen, self.font_shop_small, stats_line, (rect.x + 14, rect.y + 60), C_TEXT_DIM, shadow=False)
+            stats_lines = [
+                f"Kills: {kills}",
+                f"Hits: {hits}",
+                f"Games: {games}",
+            ]
+            stats_y = rect.y + 62
+            stats_gap = 16
+            for line in stats_lines:
+                draw_text(self.screen, self.font_tiny, line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
+                stats_y += stats_gap
 
             bar_w = rect.w - 28
             bar_h = 10
