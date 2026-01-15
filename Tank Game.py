@@ -3495,13 +3495,20 @@ class Game:
                 draw_text(self.screen, self.font_shop_desc, item.get("desc", ""), (row.x + 12, row.y + 34), C_TEXT_DIM, shadow=False)
 
                 progress_txt = f"{min(progress, target)}/{target}"
-                draw_text(self.screen, self.font_shop_small, progress_txt, (row.right - 240, row.y + 14), C_TEXT_DIM, shadow=False)
                 reward_txt = f"{int(item.get('reward', 0))} coins"
-                draw_text(self.screen, self.font_shop_small, reward_txt, (row.right - 240, row.y + 36), C_COIN, shadow=False)
+                progress_w = self.font_shop_small.size(progress_txt)[0]
+                reward_w = self.font_shop_small.size(reward_txt)[0]
+                info_gap = 10
+                status_x = row.right - 120
+                group_w = progress_w + info_gap + reward_w
+                group_x = max(row.x + row.w * 0.5, status_x - 16 - group_w)
+                info_y = row.y + 18
+                draw_text(self.screen, self.font_shop_small, progress_txt, (group_x, info_y), C_TEXT_DIM, shadow=False)
+                draw_text(self.screen, self.font_shop_small, reward_txt, (group_x + progress_w + info_gap, info_y), C_COIN, shadow=False)
 
                 status = "CLAIMED" if claimed else ("COMPLETE" if progress >= target else "IN PROGRESS")
                 status_col = C_OK if claimed else (C_ACCENT if progress >= target else C_TEXT_DIM)
-                draw_text(self.screen, self.font_shop_small, status, (row.right - 120, row.y + 24), status_col, shadow=False)
+                draw_text(self.screen, self.font_shop_small, status, (status_x, row.y + 24), status_col, shadow=False)
 
                 bar_w = 220
                 bar_h = 8
@@ -3569,17 +3576,23 @@ class Game:
 
             wdef = WEAPONS[wid]
             max_text_w = rect.w - 28
-            weapon_name = clamp_text(self.font_shop_item, wdef.name, max_text_w)
             mastery_label = clamp_text(self.font_shop_small, f"Mastery Lv. {level}", max_text_w)
-            draw_text(self.screen, self.font_shop_item, weapon_name, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
-            draw_text(self.screen, self.font_shop_small, mastery_label, (rect.x + 14, rect.y + 38), C_ACCENT, shadow=False)
+            mastery_w = self.font_shop_small.size(mastery_label)[0]
+            header_gap = 12
+            header_y = rect.y + 12
+            mastery_x = rect.right - 14 - mastery_w
+            weapon_max_w = max_text_w - mastery_w - header_gap
+            weapon_name = clamp_text(self.font_shop_item, wdef.name, max(60, weapon_max_w))
+            mastery_y = header_y + (self.font_shop_item.get_height() - self.font_shop_small.get_height()) // 2
+            draw_text(self.screen, self.font_shop_item, weapon_name, (rect.x + 14, header_y), C_TEXT, shadow=False)
+            draw_text(self.screen, self.font_shop_small, mastery_label, (mastery_x, mastery_y), C_ACCENT, shadow=False)
 
             stats_lines = [
                 f"Kills: {kills} / {req_kills}",
                 f"Games: {games} / {req_games}",
             ]
-            stats_y = rect.y + 62
-            stats_gap = 20
+            stats_y = rect.y + 60
+            stats_gap = 24
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
@@ -3588,7 +3601,7 @@ class Game:
             bar_w = rect.w - 28
             bar_h = 10
             bar_x = rect.x + 14
-            bar_y = rect.y + rect.h - 34
+            bar_y = rect.y + rect.h - 38
 
             if level >= MAX_MASTERY_LEVEL:
                 pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
