@@ -1,5 +1,6 @@
 TANK GAME CHANGELOG
 
+
 v1.1
 New Features
 1. Added new tanks
@@ -11,7 +12,7 @@ Bug Fixes
 v1.2
 New Features
 1. Added Chainsaw tank
-Improvements
+Gameplay
 1. Balanced difficulty scaling
 
 
@@ -38,7 +39,7 @@ Bug Fixes
 v1.2.4
 New Features
 1. Working on a BIG update :3
-Improvements
+Gameplay
 1. Ranged enemy damage decreased from 3hp -> 2hp. And hard mode from 7hp -> 3hp
 2. Increased grace time after killing the boss from 2.5 -> 3
 3. Difficulty ramp time decreased
@@ -53,9 +54,7 @@ New Features
 2. Added Omni Pistol Tank
 3. Added Auto-Fire and a visual representation
 4. Added a Boss tracker that points towards the Boss (if applicable)
-
-
-Improvements
+Gameplay
 1. Increased Sniper bullet speed from 1450 -> 1500
 2. Decreased Sniper bullet radius from 4 -> 3
 3. Each wave lasts 13 seconds instead of 18
@@ -67,30 +66,30 @@ Improvements
 v1.3.1
 New Features
 1. Added Windscreen Wiper as an exclusive, limited, and OP Tank
-
-Improvements
+Gameplay
 1. Decreased Heal Orb heal from 2hp -> 1hp
 2. Decreased Omni Pistol damage from 11 -> 8
 3. Increased wave time from 13 -> 15
 4. Decreased Ranged enemy default damage from 2hp -> 1hp. And hard mode from 3hp -> 2hp
-5. Improved Boss tracker
-6. Improved Powerup tracker
-7. Improved Boss death loot
-8. Increased Flamethrower bullet life from 0.35 -> 0.45
+5. Improved Boss death loot
+6. Increased Flamethrower bullet life from 0.35 -> 0.45
+Improvements
+1. Improved Boss tracker
+2. Improved Powerup tracker
 
 
 v1.3.2
 New Features
 1. Added a Tank tank
 2. You can now crit enemies without an upgrade
-Improvements
+Gameplay
 1. Increased/fixed recoil on all tanks
 2. Increased Tank damage from 52hp -> 56hp
 3. Decreased Tank fire cooldown from 1.65 -> 1.5
 
 
 v1.3.3
-Improvements
+Gameplay
 1. Decreased Boss default damage from 2hp -> 1hp
 2. Decreased Boss bullet speed from 310 -> 270
 
@@ -116,13 +115,14 @@ Improvements
 1. Fixed the Mastery tab from crashing upon opening
 2. Added 2 separate tabs for Daily and Weekly Challenges
 3. Fully fixed the UIs for the Challenges tab and the Cosmetics tab
-4. Rewrote subtitle in the Mastery tab
+4. Rewrote the subtitle in the Mastery tab
+5. Fully fixed the Challenges and Mastery tab UIs
 
 
 To-Do Features
 New Features
 1. Enable fullscreen mode.
-2. Add a “Story Mode” featuring level-based progression similar to Geometry Dash or Mario.
+2. Add a Story Mode featuring level-based progression similar to Geometry Dash or Mario.
 3. Add a Kill Streak that gives extra rewards if you attack enemies without taking damage
 4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 Improvements
@@ -130,7 +130,3 @@ Improvements
 2. Fix UI for the Mastery tab
 Bug Fixes
 1.
-
-
-
-
