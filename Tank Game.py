@@ -3633,7 +3633,7 @@ class Game:
                 f"Level Wins: {min(level_wins, req_wins)} / {req_wins}",
             ]
             stats_y = rect.y + 44
-            stats_gap = self.font_tiny.get_height() + 6
+            stats_gap = self.font_tiny.get_height() + 12
             for line in stats_lines:
                 clamped_line = clamp_text(self.font_tiny, line, max_text_w)
                 draw_text(self.screen, self.font_tiny, clamped_line, (rect.x + 14, stats_y), C_TEXT_DIM, shadow=False)
