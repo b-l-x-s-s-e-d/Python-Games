@@ -115,6 +115,8 @@ v1.4.1
 Improvements
 1. Fixed the Mastery tab from crashing upon opening
 2. Added 2 separate tabs for Daily and Weekly Challenges
+3. Fully fixed the UIs for the Challenges tab and the Cosmetics tab
+4. Rewrote subtitle in the Mastery tab
 
 
 To-Do Features
@@ -125,10 +127,10 @@ New Features
 4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
-2. Fix UI for the Challenges tab, as the Challenges are overlapping
-3. Redo some subtitles to make them give more context on the tab. Example: Mastery Tab - make the subtitle explain what it is more rather than saying "Only visual"
+2. Fix UI for the Mastery tab
 Bug Fixes
 1.
+
 
 
 
