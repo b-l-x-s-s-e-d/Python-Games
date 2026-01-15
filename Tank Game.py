@@ -25,7 +25,7 @@ from pygame.math import Vector2
 # SETTINGS / CONSTANTS
 # =========================================================
 WIDTH, HEIGHT = 1100, 650
-TITLE = "Tank Game v1.3"
+TITLE = "Tank Game v1.4"
 FPS_CAP = 144
 
 RECOIL_MULT = 1.0 # Default = 1       (Recoil multiplier)
@@ -73,6 +73,18 @@ C_HEALTH = (255, 90, 110)
 C_WALL = (26, 28, 42)
 C_WALL_EDGE = (70, 80, 120)
 C_COIN = (255, 220, 120)
+
+# Cosmetic palette
+C_OUTLINE_NEON = (120, 255, 210)
+C_OUTLINE_EMBER = (255, 170, 90)
+C_OUTLINE_STEEL = (180, 200, 230)
+C_BULLET_MINT = (120, 255, 210)
+C_BULLET_VIOLET = (200, 140, 255)
+C_BULLET_GOLD = (255, 215, 120)
+C_TRAIL_SPARK = (255, 200, 140)
+C_TRAIL_ION = (120, 200, 255)
+C_EXPLOSION_PLASMA = (120, 200, 255)
+C_EXPLOSION_MAGMA = (255, 140, 90)
 
 PLAYER_RADIUS = 16
 ENEMY_RADIUS_CHASER = 14
@@ -257,6 +269,12 @@ class SaveManager:
         self.weapon_unlocks: Dict[str, bool] = {}
         self.selected_weapon: str = "pistol"
         self.cosmetic_outline_alt: bool = False
+        self.bundles_purchased: Dict[str, bool] = {}
+        self.cosmetics_unlocked: Dict[str, bool] = {}
+        self.cosmetics_equipped: Dict[str, str] = {}
+        self.daily_challenges: Dict[str, object] = {}
+        self.weekly_challenges: Dict[str, object] = {}
+        self.weapon_mastery: Dict[str, Dict[str, int]] = {}
         self.settings: Dict[str, bool] = {"audio": True, "shake": True}
         self.leaderboard: List[Dict[str, int]] = []
         self.load()
@@ -276,6 +294,12 @@ class SaveManager:
         self.weapon_unlocks = {"pistol": True}
         self.selected_weapon = "pistol"
         self.cosmetic_outline_alt = False
+        self.bundles_purchased = {}
+        self.cosmetics_unlocked = {}
+        self.cosmetics_equipped = {}
+        self.daily_challenges = {}
+        self.weekly_challenges = {}
+        self.weapon_mastery = {}
         self.settings = {"audio": True, "shake": True}
         self.leaderboard = []
 
@@ -298,6 +322,60 @@ class SaveManager:
 
         return changed
 
+    def ensure_cosmetics(self, cosmetics: List["CosmeticDef"]) -> bool:
+        changed = False
+        default_equipped = {
+            "outline": "outline_standard",
+            "bullet": "bullet_standard",
+            "trail": "trail_none",
+            "explosion": "explosion_ember",
+        }
+        if not self.cosmetics_equipped:
+            self.cosmetics_equipped = dict(default_equipped)
+            changed = True
+        for category, cid in default_equipped.items():
+            if category not in self.cosmetics_equipped:
+                self.cosmetics_equipped[category] = cid
+                changed = True
+
+        for cosmetic in cosmetics:
+            if cosmetic.id not in self.cosmetics_unlocked:
+                self.cosmetics_unlocked[cosmetic.id] = bool(cosmetic.default)
+                changed = True
+
+        for category, default_id in default_equipped.items():
+            equipped_id = self.cosmetics_equipped.get(category, default_id)
+            if equipped_id not in self.cosmetics_unlocked:
+                self.cosmetics_equipped[category] = default_id
+                equipped_id = default_id
+                changed = True
+            if not self.cosmetics_unlocked.get(equipped_id, False):
+                self.cosmetics_unlocked[equipped_id] = True
+                changed = True
+
+        if self.cosmetic_outline_alt:
+            if "outline_neon" in self.cosmetics_unlocked:
+                if not self.cosmetics_unlocked.get("outline_neon"):
+                    self.cosmetics_unlocked["outline_neon"] = True
+                    changed = True
+                self.cosmetics_equipped["outline"] = "outline_neon"
+                changed = True
+
+        return changed
+
+    def ensure_mastery(self, weapon_ids: List[str]) -> bool:
+        changed = False
+        for wid in weapon_ids:
+            if wid not in self.weapon_mastery or not isinstance(self.weapon_mastery.get(wid), dict):
+                self.weapon_mastery[wid] = {}
+                changed = True
+            stats = self.weapon_mastery[wid]
+            for key in ("kills", "hits", "games", "level"):
+                if key not in stats:
+                    stats[key] = 0
+                    changed = True
+        return changed
+
     def load(self):
         self.defaults()
         try:
@@ -311,6 +389,12 @@ class SaveManager:
             self.weapon_unlocks = dict(data.get("weapon_unlocks", self.weapon_unlocks))
             self.selected_weapon = str(data.get("selected_weapon", self.selected_weapon))
             self.cosmetic_outline_alt = bool(data.get("cosmetic_outline_alt", False))
+            self.bundles_purchased = dict(data.get("bundles_purchased", {}))
+            self.cosmetics_unlocked = dict(data.get("cosmetics_unlocked", {}))
+            self.cosmetics_equipped = dict(data.get("cosmetics_equipped", {}))
+            self.daily_challenges = dict(data.get("daily_challenges", {}))
+            self.weekly_challenges = dict(data.get("weekly_challenges", {}))
+            self.weapon_mastery = dict(data.get("weapon_mastery", {}))
             self.settings = dict(data.get("settings", self.settings))
             self.leaderboard = list(data.get("leaderboard", []))
 
@@ -328,6 +412,19 @@ class SaveManager:
 
             if not self.weapon_unlocks.get(self.selected_weapon, False):
                 self.selected_weapon = "pistol"
+
+            if not isinstance(self.bundles_purchased, dict):
+                self.bundles_purchased = {}
+            if not isinstance(self.cosmetics_unlocked, dict):
+                self.cosmetics_unlocked = {}
+            if not isinstance(self.cosmetics_equipped, dict):
+                self.cosmetics_equipped = {}
+            if not isinstance(self.daily_challenges, dict):
+                self.daily_challenges = {}
+            if not isinstance(self.weekly_challenges, dict):
+                self.weekly_challenges = {}
+            if not isinstance(self.weapon_mastery, dict):
+                self.weapon_mastery = {}
 
             self.leaderboard = [
                 e for e in self.leaderboard
@@ -350,6 +447,12 @@ class SaveManager:
                 "weapon_unlocks": self.weapon_unlocks,
                 "selected_weapon": self.selected_weapon,
                 "cosmetic_outline_alt": bool(self.cosmetic_outline_alt),
+                "bundles_purchased": self.bundles_purchased,
+                "cosmetics_unlocked": self.cosmetics_unlocked,
+                "cosmetics_equipped": self.cosmetics_equipped,
+                "daily_challenges": self.daily_challenges,
+                "weekly_challenges": self.weekly_challenges,
+                "weapon_mastery": self.weapon_mastery,
                 "settings": self.settings,
                 "leaderboard": self.leaderboard,
             }
@@ -791,6 +894,8 @@ class EnemyBase:
         self.damage_contact = 1
         self.score_value = 10
         self.hit_flash = 0.0
+        self.last_hit_weapon_id: Optional[str] = None
+        self.last_hit_by_player: bool = False
 
     def update(self, dt, game):
         raise NotImplementedError
@@ -808,10 +913,13 @@ class EnemyBase:
         if push.length_squared() > 0:
             self.vel += push * dt * 8.0
 
-    def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float):
+    def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float, weapon_id: Optional[str] = None, from_player: bool = False):
         self.hp -= dmg
         self.vel += knock_dir * (knockback / max(1.0, self.radius))
         self.hit_flash = 0.12
+        if from_player:
+            self.last_hit_by_player = True
+            self.last_hit_weapon_id = weapon_id
 
     def alive(self):
         return self.hp > 0
@@ -981,9 +1089,9 @@ class Boss(EnemyBase):
         self.bullet_life = 1.5
         self.enraged = False
 
-    def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float):
+    def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float, weapon_id: Optional[str] = None, from_player: bool = False):
         # Boss has knockback resistance
-        super().take_damage(dmg, knock_dir, knockback * 0.35)
+        super().take_damage(dmg, knock_dir, knockback * 0.35, weapon_id=weapon_id, from_player=from_player)
 
     def update(self, dt, game):
         # Enrage at low HP: shoots faster
@@ -1123,6 +1231,92 @@ SHOP_ITEMS = [
     ShopItemDef("unlock_tank", "Unlock: Tank", "Insane damage but very slow", 1, 390, 1.0, "weapon", weapon_id="tank"),
 ]
 
+SHOP_ITEMS_BY_ID = {item.id: item for item in SHOP_ITEMS}
+SHOP_ITEMS_BY_WEAPON = {item.weapon_id: item for item in SHOP_ITEMS if item.kind == "weapon"}
+
+
+@dataclass
+class CosmeticDef:
+    id: str
+    name: str
+    desc: str
+    category: str  # outline / bullet / trail / explosion
+    cost: int
+    color: Tuple[int, int, int]
+    default: bool = False
+    bundle_only: bool = False
+
+
+COSMETICS = [
+    CosmeticDef("outline_standard", "Standard Outline", "Clean default trim.", "outline", 0, C_ACCENT, default=True),
+    CosmeticDef("outline_neon", "Neon Outline", "Bright cyan glow.", "outline", 120, C_OUTLINE_NEON),
+    CosmeticDef("outline_ember", "Ember Outline", "Warm orange trim.", "outline", 140, C_OUTLINE_EMBER),
+    CosmeticDef("outline_steel", "Steel Outline", "Cold metallic edge.", "outline", 0, C_OUTLINE_STEEL, bundle_only=True),
+    CosmeticDef("bullet_standard", "Standard Rounds", "Classic bright shots.", "bullet", 0, C_BULLET, default=True),
+    CosmeticDef("bullet_mint", "Mint Rounds", "Fresh neon bullets.", "bullet", 110, C_BULLET_MINT),
+    CosmeticDef("bullet_violet", "Violet Rounds", "Electric violet shots.", "bullet", 130, C_BULLET_VIOLET),
+    CosmeticDef("bullet_gold", "Gold Rounds", "Lux gilded shots.", "bullet", 0, C_BULLET_GOLD, bundle_only=True),
+    CosmeticDef("trail_none", "No Trail", "Pure, clean movement.", "trail", 0, C_TEXT_DIM, default=True),
+    CosmeticDef("trail_spark", "Spark Trail", "Short warm sparks.", "trail", 120, C_TRAIL_SPARK),
+    CosmeticDef("trail_ion", "Ion Trail", "Cool ion streak.", "trail", 150, C_TRAIL_ION),
+    CosmeticDef("explosion_ember", "Ember Burst", "Standard explosion flare.", "explosion", 0, C_WARN, default=True),
+    CosmeticDef("explosion_plasma", "Plasma Burst", "Bright cyan burst.", "explosion", 170, C_EXPLOSION_PLASMA),
+    CosmeticDef("explosion_magma", "Magma Burst", "Heavy orange blast.", "explosion", 0, C_EXPLOSION_MAGMA, bundle_only=True),
+]
+
+COSMETICS_BY_ID = {cosmetic.id: cosmetic for cosmetic in COSMETICS}
+
+
+@dataclass
+class BundleDef:
+    id: str
+    name: str
+    desc: str
+    weapons: List[str]
+    meta: List[str]
+    cosmetics: List[str]
+    discount: float
+
+
+BUNDLES = [
+    BundleDef(
+        "starter_arsenal",
+        "Starter Arsenal",
+        "Cannon + Burst Rifle + +1 Max HP at a starter discount.",
+        weapons=["cannon", "burst"],
+        meta=["meta_hp"],
+        cosmetics=[],
+        discount=0.15,
+    ),
+    BundleDef(
+        "speed_demon",
+        "Speed Demon",
+        "Minigun + Move Speed + Dash CDR to keep you fast.",
+        weapons=["minigun"],
+        meta=["meta_move", "meta_dash"],
+        cosmetics=["bullet_mint"],
+        discount=0.18,
+    ),
+    BundleDef(
+        "heavy_metal",
+        "Heavy Metal",
+        "Tank + Armor core + exclusive Steel cosmetics.",
+        weapons=["tank"],
+        meta=["armor"],
+        cosmetics=["outline_steel", "explosion_magma"],
+        discount=0.22,
+    ),
+]
+
+
+MAX_MASTERY_LEVEL = 5
+
+
+def mastery_requirements(level: int) -> Tuple[int, int]:
+    kills_needed = int(30 * (level ** 2))
+    games_needed = int(5 + (level - 1) * 7)
+    return kills_needed, games_needed
+
 
 # =========================================================
 # PLAYER
@@ -1181,7 +1375,7 @@ class Player:
         self.meta_dash_mul = 1.0
         self.meta_armor_mul = 1.0
         self.meta_bulletspd_mul = 1.0
-        self.outline_alt = False
+        self.outline_color = C_ACCENT
 
     def set_weapon(self, weapon_id: str):
         self.weapon_id = weapon_id
@@ -1345,8 +1539,7 @@ class Player:
         p = Vector2(self.pos.x - cam.x, self.pos.y - cam.y)
         pygame.draw.circle(surf, col, (int(p.x), int(p.y)), PLAYER_RADIUS)
 
-        outline_col = C_ACCENT_2 if self.outline_alt else C_ACCENT
-        circle_outline(surf, outline_col, (int(p.x), int(p.y)), PLAYER_RADIUS + 4, 2)
+        circle_outline(surf, self.outline_color, (int(p.x), int(p.y)), PLAYER_RADIUS + 4, 2)
 
         tip = p + self.aim_dir * (PLAYER_RADIUS + 10)
         left = p + self.aim_dir.rotate(140) * 10
@@ -1386,6 +1579,10 @@ class Game:
         # Future-proof: ensure save knows about every WEAPONS key (so new weapons never "vanish")
         if self.save.ensure_weapons(list(WEAPONS.keys())):
             self.save.save()
+        if self.save.ensure_cosmetics(COSMETICS):
+            self.save.save()
+        if self.save.ensure_mastery(list(WEAPONS.keys())):
+            self.save.save()
 
         # Audio
         self.audio_enabled = AUDIO_ENABLED_DEFAULT and bool(self.save.settings.get("audio", True))
@@ -1401,7 +1598,7 @@ class Game:
         self._init_audio()
 
         # State
-        self.state = "menu"  # menu, weapons, shop, controls, leaderboard, playing, paused, levelup, gameover
+        self.state = "menu"  # menu, weapons, shop, controls, leaderboard, challenges, playing, paused, levelup, gameover
         self.running = True
 
         # Camera
@@ -1411,6 +1608,7 @@ class Game:
 
         # Entities
         self.player = Player(Vector2(ARENA_W / 2, ARENA_H / 2), weapon_id=self.save.selected_weapon)
+        self.player.outline_color = self.get_outline_color()
         self.projectiles: List[Projectile] = []
         self.enemy_projectiles: List[Projectile] = []
         self.enemies: List[EnemyBase] = []
@@ -1446,14 +1644,16 @@ class Game:
 
         # UI
         self.menu_buttons: List[Button] = []
+        self.menu_challenges_btn: Optional[Button] = None
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
+        self.challenges_back_btn: Optional[Button] = None
         self.pause_buttons: List[Button] = []
         self.gameover_buttons: List[Button] = []
 
         # Shop tabs/pages
-        self.shop_tab = "meta"      # meta / weapons / cosmetics
+        self.shop_tab = "meta"      # meta / weapons / cosmetics / bundles
         self.shop_page = 0
         self.shop_tabs: List[TabButton] = []
         self.shop_next_btn: Optional[Button] = None
@@ -1465,10 +1665,18 @@ class Game:
         self.weapon_prev_btn: Optional[Button] = None
         self.weapon_notice_text = ""
         self.weapon_notice_timer = 0.0
+        self.weapons_view = "weapons"
+        self.weapon_tabs: List[TabButton] = []
+
+        self.progress_dirty = False
+        self.progress_dirty_timer = 0.0
+        self.trail_timer = 0.0
 
         self.last_run_coins_earned = 0
         self.coins_awarded_this_gameover = False
         self.leaderboard_recorded = False
+
+        self.refresh_challenges()
 
         self._build_menus()
 
@@ -1533,14 +1741,20 @@ class Game:
             Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Leaderboard", self.open_leaderboard),
         ]
         self.menu_quit_btn = Button(
-    pygame.Rect(20, 18, 54, 48),
-    "X",
-    self.quit_game
-)
+            pygame.Rect(20, 18, 54, 48),
+            "X",
+            self.quit_game
+        )
+        self.menu_challenges_btn = Button(
+            pygame.Rect(WIDTH - 170, 20, 150, 40),
+            "Challenges",
+            lambda: self.set_state("challenges")
+        )
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
 
         # Weapons pagination buttons (bottom-right)
         self.weapon_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_weapon_page(-1))
@@ -1560,10 +1774,10 @@ class Game:
 
         # Shop tabs
         tab_y = 120
-        tab_w = 190
+        tab_w = 180
         tab_h = 44
         tab_gap = 14
-        start_x = (WIDTH - (tab_w * 3 + tab_gap * 2)) // 2
+        start_x = (WIDTH - (tab_w * 4 + tab_gap * 3)) // 2
 
         def set_tab(tid: str):
             self.shop_tab = tid
@@ -1573,10 +1787,25 @@ class Game:
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 0, tab_y, tab_w, tab_h), "META", set_tab, "meta"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 1, tab_y, tab_w, tab_h), "WEAPONS", set_tab, "weapons"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 2, tab_y, tab_w, tab_h), "COSMETICS", set_tab, "cosmetics"),
+            TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 3, tab_y, tab_w, tab_h), "BUNDLES", set_tab, "bundles"),
         ]
 
         self.shop_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_shop_page(-1))
         self.shop_next_btn = Button(pygame.Rect(WIDTH - 170, HEIGHT - 80, 120, 52), "Next", lambda: self.change_shop_page(+1))
+
+        # Weapons tabs
+        wtab_y = 108
+        wtab_w = 190
+        wtab_h = 40
+        wtab_gap = 14
+        wtab_start_x = (WIDTH - (wtab_w * 2 + wtab_gap)) // 2
+        def set_weapon_view(view: str):
+            self.weapons_view = view
+            self.weapon_page = 0
+        self.weapon_tabs = [
+            TabButton(pygame.Rect(wtab_start_x, wtab_y, wtab_w, wtab_h), "WEAPONS", set_weapon_view, "weapons"),
+            TabButton(pygame.Rect(wtab_start_x + wtab_w + wtab_gap, wtab_y, wtab_w, wtab_h), "MASTERY", set_weapon_view, "mastery"),
+        ]
 
     def set_state(self, st: str):
         self.state = st
@@ -1603,10 +1832,269 @@ class Game:
     def open_shop(self):
         self.shop_tab = "meta"
         self.shop_page = 0
+        if self.save.ensure_cosmetics(COSMETICS):
+            self.save.save()
         self.set_state("shop")
 
     def open_leaderboard(self):
         self.set_state("leaderboard")
+
+    def open_challenges(self):
+        self.set_state("challenges")
+
+    # ---------------- Cosmetics ----------------
+    def get_cosmetic(self, cosmetic_id: str) -> Optional[CosmeticDef]:
+        return COSMETICS_BY_ID.get(cosmetic_id)
+
+    def get_equipped_cosmetic(self, category: str) -> CosmeticDef:
+        cosmetic_id = self.save.cosmetics_equipped.get(category)
+        cosmetic = self.get_cosmetic(cosmetic_id) if cosmetic_id else None
+        if cosmetic:
+            return cosmetic
+        fallback = {
+            "outline": COSMETICS_BY_ID["outline_standard"],
+            "bullet": COSMETICS_BY_ID["bullet_standard"],
+            "trail": COSMETICS_BY_ID["trail_none"],
+            "explosion": COSMETICS_BY_ID["explosion_ember"],
+        }
+        return fallback[category]
+
+    def get_outline_color(self) -> Tuple[int, int, int]:
+        return self.get_equipped_cosmetic("outline").color
+
+    def get_bullet_color(self) -> Tuple[int, int, int]:
+        return self.get_equipped_cosmetic("bullet").color
+
+    def get_trail_cosmetic(self) -> CosmeticDef:
+        return self.get_equipped_cosmetic("trail")
+
+    def get_explosion_color(self) -> Tuple[int, int, int]:
+        return self.get_equipped_cosmetic("explosion").color
+
+    def buy_cosmetic(self, cosmetic: CosmeticDef):
+        if cosmetic.bundle_only:
+            return
+        if self.save.cosmetics_unlocked.get(cosmetic.id, False):
+            return
+        if self.save.coins < cosmetic.cost:
+            return
+        self.save.coins -= cosmetic.cost
+        self.save.cosmetics_unlocked[cosmetic.id] = True
+        self.save.cosmetics_equipped[cosmetic.category] = cosmetic.id
+        self.save.save()
+        self.audio_play("buy")
+
+    def equip_cosmetic(self, cosmetic: CosmeticDef):
+        if not self.save.cosmetics_unlocked.get(cosmetic.id, False):
+            return
+        self.save.cosmetics_equipped[cosmetic.category] = cosmetic.id
+        self.save.save()
+        self.audio_play("buy")
+
+    # ---------------- Bundles ----------------
+    def bundle_base_value(self, bundle: BundleDef) -> int:
+        total = 0
+        for wid in bundle.weapons:
+            item = SHOP_ITEMS_BY_WEAPON.get(wid)
+            if item:
+                total += item.base_cost
+        for mid in bundle.meta:
+            item = SHOP_ITEMS_BY_ID.get(mid)
+            if item:
+                total += item.base_cost
+        for cid in bundle.cosmetics:
+            cosmetic = COSMETICS_BY_ID.get(cid)
+            if cosmetic:
+                total += cosmetic.cost
+        return total
+
+    def bundle_owned_value(self, bundle: BundleDef) -> int:
+        owned = 0
+        for wid in bundle.weapons:
+            if self.save.weapon_unlocks.get(wid, False):
+                item = SHOP_ITEMS_BY_WEAPON.get(wid)
+                if item:
+                    owned += item.base_cost
+        for mid in bundle.meta:
+            if int(self.save.shop_levels.get(mid, 0)) > 0:
+                item = SHOP_ITEMS_BY_ID.get(mid)
+                if item:
+                    owned += item.base_cost
+        for cid in bundle.cosmetics:
+            if self.save.cosmetics_unlocked.get(cid, False):
+                cosmetic = COSMETICS_BY_ID.get(cid)
+                if cosmetic:
+                    owned += cosmetic.cost
+        return owned
+
+    def bundle_price(self, bundle: BundleDef) -> int:
+        base_value = self.bundle_base_value(bundle)
+        owned_value = self.bundle_owned_value(bundle)
+        remaining = max(0, base_value - owned_value)
+        return int(remaining * (1.0 - bundle.discount))
+
+    def bundle_is_owned(self, bundle: BundleDef) -> bool:
+        if self.save.bundles_purchased.get(bundle.id, False):
+            return True
+        base_value = self.bundle_base_value(bundle)
+        return self.bundle_owned_value(bundle) >= base_value and base_value > 0
+
+    def buy_bundle(self, bundle: BundleDef):
+        if self.bundle_is_owned(bundle):
+            return
+        cost = self.bundle_price(bundle)
+        if cost <= 0 or self.save.coins < cost:
+            return
+        self.save.coins -= cost
+        for wid in bundle.weapons:
+            self.save.weapon_unlocks[wid] = True
+        for mid in bundle.meta:
+            item = SHOP_ITEMS_BY_ID.get(mid)
+            if not item:
+                continue
+            current = int(self.save.shop_levels.get(mid, 0))
+            self.save.shop_levels[mid] = min(item.max_level, current + 1)
+        for cid in bundle.cosmetics:
+            self.save.cosmetics_unlocked[cid] = True
+        self.save.bundles_purchased[bundle.id] = True
+        self.save.save()
+        self.audio_play("buy")
+
+    # ---------------- Challenges ----------------
+    def _daily_key(self) -> str:
+        return time.strftime("%Y-%j", time.localtime())
+
+    def _weekly_key(self) -> str:
+        return time.strftime("%Y-%V", time.localtime())
+
+    def refresh_challenges(self):
+        daily_key = self._daily_key()
+        weekly_key = self._weekly_key()
+        changed = False
+        if self.save.daily_challenges.get("key") != daily_key:
+            self.save.daily_challenges = {
+                "key": daily_key,
+                "generated_at": int(time.time()),
+                "items": self._generate_daily_challenges(daily_key),
+            }
+            changed = True
+        if self.save.weekly_challenges.get("key") != weekly_key:
+            self.save.weekly_challenges = {
+                "key": weekly_key,
+                "generated_at": int(time.time()),
+                "items": self._generate_weekly_challenges(weekly_key),
+            }
+            changed = True
+        if changed:
+            self.save.save()
+
+    def _generate_daily_challenges(self, key: str) -> List[Dict[str, object]]:
+        rng = random.Random(key)
+        weapon_ids = list(WEAPONS.keys())
+        candidates = [
+            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 40, "metric": "kills"},
+            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 30, "metric": "waves"},
+            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 25, "metric": "runs"},
+        ]
+        weapon_pick = rng.choice(weapon_ids)
+        weapon_name = WEAPONS[weapon_pick].name
+        candidates.append({
+            "id": f"daily_weapon_{weapon_pick}",
+            "name": f"Weapon Focus: {weapon_name}",
+            "desc": f"Defeat 25 enemies using {weapon_name}.",
+            "target": 25,
+            "reward": 35,
+            "metric": "weapon_kills",
+            "weapon_id": weapon_pick,
+        })
+        count = rng.randint(1, 3)
+        picks = rng.sample(candidates, count)
+        return [
+            {
+                **c,
+                "progress": 0,
+                "claimed": False,
+            }
+            for c in picks
+        ]
+
+    def _generate_weekly_challenges(self, key: str) -> List[Dict[str, object]]:
+        rng = random.Random(key)
+        candidates = [
+            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 2 bosses.", "target": 2, "reward": 160, "metric": "boss_kills"},
+            {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 4000 total damage.", "target": 4000, "reward": 180, "metric": "damage"},
+            {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 18.", "target": 18, "reward": 200, "metric": "high_wave"},
+            {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 5 runs.", "target": 5, "reward": 140, "metric": "runs"},
+        ]
+        count = rng.randint(1, 2)
+        picks = rng.sample(candidates, count)
+        return [
+            {
+                **c,
+                "progress": 0,
+                "claimed": False,
+            }
+            for c in picks
+        ]
+
+    def update_challenges(self, metric: str, amount: int, weapon_id: Optional[str] = None, absolute: bool = False):
+        changed = False
+        for bucket in (self.save.daily_challenges.get("items", []), self.save.weekly_challenges.get("items", [])):
+            for item in bucket:
+                if item.get("metric") != metric:
+                    continue
+                if metric == "weapon_kills" and item.get("weapon_id") != weapon_id:
+                    continue
+                if absolute:
+                    item["progress"] = max(int(item.get("progress", 0)), int(amount))
+                else:
+                    item["progress"] = int(item.get("progress", 0)) + int(amount)
+                if not item.get("claimed") and item["progress"] >= int(item.get("target", 0)):
+                    item["claimed"] = True
+                    reward = int(item.get("reward", 0))
+                    self.save.coins += reward
+                    self.float_texts.append(FloatingText(self.player.pos + Vector2(0, -34), f"+{reward} COINS", C_COIN, life=1.0))
+                changed = True
+        if changed:
+            self.progress_dirty = True
+
+    def time_until_reset(self, kind: str) -> str:
+        now = time.time()
+        if kind == "daily":
+            tomorrow = time.localtime(now + 86400)
+            reset = time.mktime((tomorrow.tm_year, tomorrow.tm_mon, tomorrow.tm_mday, 0, 0, 0, 0, 0, -1))
+        else:
+            now_local = time.localtime(now)
+            days_ahead = (7 - now_local.tm_wday) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+            next_week = time.localtime(now + days_ahead * 86400)
+            reset = time.mktime((next_week.tm_year, next_week.tm_mon, next_week.tm_mday, 0, 0, 0, 0, 0, -1))
+        remaining = max(0, int(reset - now))
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        return f"{hours}h {minutes}m"
+
+    # ---------------- Mastery ----------------
+    def update_mastery(self, weapon_id: str, hits: int = 0, kills: int = 0, games: int = 0):
+        stats = self.save.weapon_mastery.get(weapon_id)
+        if not stats:
+            return
+        stats["hits"] = int(stats.get("hits", 0)) + hits
+        stats["kills"] = int(stats.get("kills", 0)) + kills
+        stats["games"] = int(stats.get("games", 0)) + games
+        leveled = False
+        while stats.get("level", 0) < MAX_MASTERY_LEVEL:
+            next_level = stats["level"] + 1
+            req_kills, req_games = mastery_requirements(next_level)
+            if stats["kills"] >= req_kills and stats["games"] >= req_games:
+                stats["level"] = next_level
+                leveled = True
+            else:
+                break
+        if leveled:
+            self.float_texts.append(FloatingText(self.player.pos + Vector2(0, -50), f"{WEAPONS[weapon_id].name} Mastery +1", C_ACCENT))
+        self.progress_dirty = True
 
     def change_shop_page(self, delta: int):
         self.shop_page = max(0, self.shop_page + delta)
@@ -1657,19 +2145,17 @@ class Game:
             self.audio_enabled = bool(self.save.settings.get("audio", True))
         self.audio_play("buy")
 
-    def toggle_cosmetic(self):
-        self.save.cosmetic_outline_alt = not self.save.cosmetic_outline_alt
-        self.save.save()
-        self.audio_play("buy")
-
     # ---------------- Weapons screen ----------------
     def open_weapons_screen(self):
         # Ensure weapons list is always synced before showing (future updates safety)
         if self.save.ensure_weapons(list(WEAPONS.keys())):
             self.save.save()
+        if self.save.ensure_mastery(list(WEAPONS.keys())):
+            self.save.save()
         self.weapon_page = 0
         self.weapon_notice_text = ""
         self.weapon_notice_timer = 0.0
+        self.weapons_view = "weapons"
         self.set_state("weapons")
 
     def change_weapon_page(self, delta: int):
@@ -1696,7 +2182,7 @@ class Game:
             self.player.max_hp += hp_lvl
             self.player.hp += hp_lvl
 
-        self.player.outline_alt = bool(self.save.cosmetic_outline_alt)
+        self.player.outline_color = self.get_outline_color()
 
     # ---------------- Run reset ----------------
     def start_run(self):
@@ -1708,6 +2194,7 @@ class Game:
 
         self.player = Player(Vector2(ARENA_W / 2, ARENA_H / 2), weapon_id=weapon_id)
         self.apply_meta_upgrades_to_player()
+        self.update_mastery(weapon_id, games=1)
 
         self.projectiles.clear()
         self.enemy_projectiles.clear()
@@ -1883,10 +2370,11 @@ class Game:
                     t = 0.0 if n == 1 else (i / (n - 1))
                     angles.append(lerp(-spread * 0.5, spread * 0.5, t))
 
+        base_col = self.get_bullet_color()
         for ang in angles:
             dirn = base_dir.rotate(ang)
             vel = dirn * bspd
-            col = C_BULLET if not is_crit else (255, 240, 120)
+            col = base_col if not is_crit else (255, 240, 120)
             splash = w.splash_radius if w.splash_radius > 0 else 0.0
             pierce_total = max(0, player.piercing + int(getattr(w, "base_pierce", 0)))
             b = Projectile(
@@ -1929,7 +2417,9 @@ class Game:
                 dirn = dirn.normalize()
             else:
                 dirn = Vector2(1, 0)
-            best.take_damage(dmg, dirn, 70.0)
+            best.take_damage(dmg, dirn, 70.0, weapon_id=self.player.weapon_id, from_player=True)
+            self.update_mastery(self.player.weapon_id, hits=1)
+            self.update_challenges("damage", dmg)
             self.float_texts.append(FloatingText(best.pos + Vector2(0, -10), str(dmg), C_ACCENT))
             self._spawn_hit_particles(best.pos, (200, 220, 255))
             current = best
@@ -2022,6 +2512,11 @@ class Game:
     def on_boss_killed(self, boss: Boss):
         center = Vector2(boss.pos)
         self.player.score += boss.score_value
+        self.update_challenges("boss_kills", 1)
+        self.update_challenges("kills", 1)
+        if boss.last_hit_by_player and boss.last_hit_weapon_id:
+            self.update_mastery(boss.last_hit_weapon_id, kills=1)
+            self.update_challenges("weapon_kills", 1, weapon_id=boss.last_hit_weapon_id)
 
         stage = max(1, self.wave // BOSS_EVERY_WAVES)
         bonus = 10 + 4 * (stage - 1)
@@ -2044,7 +2539,7 @@ class Game:
         ptype = random.choice(["damage_boost", "rapid_fire", "speed_boost", "shield"])
         self.pickups.append(Pickup(center + Vector2(0, -20), "power", 0, ptype))
 
-        self._spawn_hit_particles(center, (255, 190, 210))
+        self._spawn_hit_particles(center, self.get_explosion_color())
         self.shake = max(self.shake, 12.0)
 
         self.in_boss_fight = False
@@ -2101,6 +2596,7 @@ class Game:
             wave=self.wave,
             level=self.player.level,
         )
+        self.update_challenges("runs", 1)
         self.save.save()
         self.leaderboard_recorded = True
 
@@ -2112,7 +2608,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop", "leaderboard"):
+                if self.state in ("controls", "weapons", "shop", "leaderboard", "challenges"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -2156,6 +2652,7 @@ class Game:
 
     # ---------------- Updates (Playing) ----------------
     def update_playing(self, dt, events):
+        self.refresh_challenges()
         self.survival_time = time.time() - self.start_time
         self.update_difficulty()
 
@@ -2169,6 +2666,8 @@ class Game:
             if self.wave_timer <= 0:
                 self.wave += 1
                 self.wave_timer = WAVE_TIME_BASE
+                self.update_challenges("waves", 1)
+                self.update_challenges("high_wave", self.wave, absolute=True)
 
                 if self.wave % BOSS_EVERY_WAVES == 0:
                     self.spawn_boss()
@@ -2213,6 +2712,14 @@ class Game:
 
         mouse_world = Vector2(mx, my) + self.cam + self.shake_vec
         self.player.update(dt, self, move, mouse_world, mouse_buttons, keys)
+
+        trail = self.get_trail_cosmetic()
+        if trail.id != "trail_none" and self.player.vel.length_squared() > 4.0:
+            self.trail_timer -= dt
+            if self.trail_timer <= 0:
+                jitter = Vector2(random.uniform(-6, 6), random.uniform(-6, 6))
+                self.particles.append(Particle(self.player.pos + jitter, -self.player.vel * 0.1, trail.color, life=0.25, radius=2))
+                self.trail_timer = 0.05 if trail.id == "trail_spark" else 0.04
 
         pickup_dist = PICKUP_ATTRACT_DIST_BASE + self.player.magnet_bonus
         for p in self.pickups:
@@ -2269,6 +2776,10 @@ class Game:
                     self.on_boss_killed(e)
                 else:
                     self.player.score += e.score_value
+                    if e.last_hit_by_player and e.last_hit_weapon_id:
+                        self.update_mastery(e.last_hit_weapon_id, kills=1)
+                        self.update_challenges("kills", 1)
+                        self.update_challenges("weapon_kills", 1, weapon_id=e.last_hit_weapon_id)
                     self.drop_pickups(Vector2(e.pos))
         self.enemies = alive
 
@@ -2279,6 +2790,13 @@ class Game:
         for ft in self.float_texts:
             ft.update(dt)
         self.float_texts = [ft for ft in self.float_texts if ft.life > 0]
+
+        if self.progress_dirty:
+            self.progress_dirty_timer += dt
+            if self.progress_dirty_timer >= 2.0:
+                self.save.save()
+                self.progress_dirty = False
+                self.progress_dirty_timer = 0.0
 
         if self.player.try_level_up():
             self.audio_play("levelup")
@@ -2334,9 +2852,11 @@ class Game:
                     knock_dir = knock_dir.normalize()
                 else:
                     knock_dir = Vector2(1, 0)
-                e.take_damage(dmg, knock_dir, 110.0)
+                e.take_damage(dmg, knock_dir, 110.0, weapon_id=self.player.weapon_id, from_player=True)
+                self.update_mastery(self.player.weapon_id, hits=1)
+                self.update_challenges("damage", dmg)
                 self.float_texts.append(FloatingText(e.pos + Vector2(0, -10), str(dmg), C_WARN))
-        self._spawn_hit_particles(center, (255, 180, 120))
+        self._spawn_hit_particles(center, self.get_explosion_color())
         self.shake = max(self.shake, 6.0)
 
     def _handle_bullet_enemy_collisions(self):
@@ -2367,7 +2887,9 @@ class Game:
                     }.get(self.player.weapon_id, 1.0)
 
                     knockback = base_knock * weapon_knock * self.player.knockback_mult
-                    e.take_damage(b.damage, knock_dir, knockback)
+                    e.take_damage(b.damage, knock_dir, knockback, weapon_id=self.player.weapon_id, from_player=True)
+                    self.update_mastery(self.player.weapon_id, hits=1)
+                    self.update_challenges("damage", b.damage)
                     self.float_texts.append(FloatingText(e.pos + Vector2(random.uniform(-6, 6), -10),
                                                          str(b.damage), C_WARN))
                     self.audio_play("hit")
@@ -2781,6 +3303,7 @@ class Game:
         self.screen.fill(C_BG)
         cx = WIDTH // 2
         t = time.time()
+        self.refresh_challenges()
 
         draw_text(self.screen, self.font_big, "TANK GAME SURVIVAL", (cx, 92), C_TEXT, center=True)
         draw_text(self.screen, self.font_ui, "survive • upgrade • progress • unlock tanks", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
@@ -2802,7 +3325,11 @@ class Game:
             b.update(1 / 60, mouse_pos, mouse_down, events)
             b.draw(self.screen, self.font_med)
 
-            # Top-left X quit button
+        if self.menu_challenges_btn:
+            self.menu_challenges_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.menu_challenges_btn.draw(self.screen, self.font_small)
+
+        # Top-left X quit button
         self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
         self.menu_quit_btn.draw(self.screen, self.font_med)
 
@@ -2869,38 +3396,84 @@ class Game:
             self.leaderboard_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
             self.leaderboard_back_btn.draw(self.screen, self.font_med)
 
-    def draw_weapons(self, events):
+    def draw_challenges(self, events):
         self.screen.fill(C_BG)
+        self.refresh_challenges()
         cx = WIDTH // 2
 
-        # countdown any hint toast
-        self.weapon_notice_timer = max(0.0, self.weapon_notice_timer - (1 / 60))
+        draw_text(self.screen, self.font_big, "CHALLENGES", (cx, 92), C_TEXT, center=True)
+        draw_text(self.screen, self.font_ui, "Daily + Weekly goals reset automatically", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
 
-        draw_text(self.screen, self.font_shop_title, "WEAPONS", (cx, 62), C_TEXT, center=True)
-        draw_text(self.screen, self.font_ui, "Pick an unlocked troop (buy more in Shop → WEAPONS).",
-                  (cx, 94), C_TEXT_DIM, center=True, shadow=False)
-
-        box = pygame.Rect(70, 125, WIDTH - 140, HEIGHT - 220)
+        box = pygame.Rect(120, 170, WIDTH - 240, HEIGHT - 280)
         pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
-        cols = 3
-        rows = 3  # ✅ force 3 rows => 9 cards per page
+        daily_rect = pygame.Rect(box.x + 12, box.y + 12, box.w - 24, (box.h // 2) - 18)
+        weekly_rect = pygame.Rect(box.x + 12, box.y + box.h // 2 + 6, box.w - 24, (box.h // 2) - 18)
 
-        gap_x = 10
-        gap_y = 12
-        pad = 14
+        draw_text(self.screen, self.font_shop_item, f"DAILY  •  Resets in {self.time_until_reset('daily')}", (daily_rect.x, daily_rect.y - 2), C_TEXT, shadow=False)
+        draw_text(self.screen, self.font_shop_item, f"WEEKLY  •  Resets in {self.time_until_reset('weekly')}", (weekly_rect.x, weekly_rect.y - 2), C_TEXT, shadow=False)
 
-        # Compute card sizes so 3x3 fits perfectly in the box
+        def draw_list(items, rect):
+            if not items:
+                draw_text(self.screen, self.font_small, "No challenges available.", (rect.centerx, rect.centery), C_TEXT_DIM, center=True, shadow=False)
+                return
+            row_h = 64
+            gap = 10
+            y = rect.y + 22
+            for item in items:
+                row = pygame.Rect(rect.x, y, rect.w, row_h)
+                y += row_h + gap
+                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), row, border_radius=12)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), row, 2, border_radius=12)
+
+                progress = int(item.get("progress", 0))
+                target = int(item.get("target", 1))
+                claimed = bool(item.get("claimed", False))
+
+                draw_text(self.screen, self.font_shop_item, item.get("name", "Challenge"), (row.x + 12, row.y + 8), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_shop_desc, item.get("desc", ""), (row.x + 12, row.y + 34), C_TEXT_DIM, shadow=False)
+
+                progress_txt = f"{min(progress, target)}/{target}"
+                draw_text(self.screen, self.font_shop_small, progress_txt, (row.right - 240, row.y + 14), C_TEXT_DIM, shadow=False)
+                reward_txt = f"{int(item.get('reward', 0))} coins"
+                draw_text(self.screen, self.font_shop_small, reward_txt, (row.right - 240, row.y + 36), C_COIN, shadow=False)
+
+                status = "CLAIMED" if claimed else ("COMPLETE" if progress >= target else "IN PROGRESS")
+                status_col = C_OK if claimed else (C_ACCENT if progress >= target else C_TEXT_DIM)
+                draw_text(self.screen, self.font_shop_small, status, (row.right - 120, row.y + 24), status_col, shadow=False)
+
+                bar_w = 220
+                bar_h = 8
+                bar_x = row.right - bar_w - 18
+                bar_y = row.y + row.h - 16
+                pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
+                fill_w = int(bar_w * clamp(progress / max(1, target), 0, 1))
+                pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, fill_w, bar_h), border_radius=6)
+
+        draw_list(self.save.daily_challenges.get("items", []), daily_rect)
+        draw_list(self.save.weekly_challenges.get("items", []), weekly_rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+        if self.challenges_back_btn:
+            self.challenges_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.challenges_back_btn.draw(self.screen, self.font_med)
+
+    def draw_weapon_mastery(self, box: pygame.Rect, mouse_pos, mouse_down, events):
+        cols = 2
+        rows = 3
+        gap_x = 12
+        gap_y = 14
+        pad = 16
+
         usable_w = box.w - pad * 2
         usable_h = box.h - pad * 2
-
         card_w = (usable_w - gap_x * (cols - 1)) // cols
         card_h = (usable_h - gap_y * (rows - 1)) // rows
 
         cards_per_page = cols * rows
-
-        weapon_ids = list(WEAPONS.keys())  # insertion order; new weapons auto included
+        weapon_ids = list(WEAPONS.keys())
         total_pages = max(1, math.ceil(len(weapon_ids) / cards_per_page))
         self.weapon_page = int(clamp(self.weapon_page, 0, total_pages - 1))
 
@@ -2908,15 +3481,11 @@ class Game:
         end = start + cards_per_page
         page_ids = weapon_ids[start:end]
 
-        # enable/disable buttons
         self.weapon_prev_btn.enabled = self.weapon_page > 0
         self.weapon_next_btn.enabled = (self.weapon_page + 1) < total_pages
 
         start_x = box.x + pad
         start_y = box.y + pad
-
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
 
         for i, wid in enumerate(page_ids):
             c = i % cols
@@ -2928,50 +3497,155 @@ class Game:
                 card_h
             )
 
+            stats = self.save.weapon_mastery.get(wid, {"kills": 0, "hits": 0, "games": 0, "level": 0})
+            level = int(stats.get("level", 0))
+            kills = int(stats.get("kills", 0))
+            hits = int(stats.get("hits", 0))
+            games = int(stats.get("games", 0))
+
+            pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=14)
+            pygame.draw.rect(self.screen, C_WALL_EDGE, rect, 2, border_radius=14)
+
             wdef = WEAPONS[wid]
-            unlocked = bool(self.save.weapon_unlocks.get(wid, False))
-            equipped = (self.save.selected_weapon == wid) and unlocked
+            draw_text(self.screen, self.font_shop_item, wdef.name, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
+            draw_text(self.screen, self.font_shop_small, f"Mastery Lv. {level}", (rect.x + 14, rect.y + 38), C_ACCENT, shadow=False)
 
-            hover = rect.collidepoint(mouse_pos)
-            if hover and mouse_down:
-                if unlocked:
-                    self.save.selected_weapon = wid
-                    self.save.save()
-                    self.audio_play("buy")
-                else:
-                    self.weapon_notice_text = "LOCKED — buy it in SHOP → WEAPONS"
-                    self.weapon_notice_timer = 1.2
-                    self.audio_play("hit")
+            stats_line = f"Kills {kills}  •  Hits {hits}  •  Games {games}"
+            draw_text(self.screen, self.font_shop_small, stats_line, (rect.x + 14, rect.y + 60), C_TEXT_DIM, shadow=False)
 
-            bg = (*C_PANEL_2, 245) if unlocked else (*C_PANEL_2, 190)
-            edge = C_ACCENT if hover else C_WALL_EDGE
-            pygame.draw.rect(self.screen, bg, rect, border_radius=14)
-            pygame.draw.rect(self.screen, edge, rect, 2, border_radius=14)
+            bar_w = rect.w - 28
+            bar_h = 10
+            bar_x = rect.x + 14
+            bar_y = rect.y + rect.h - 34
 
-            title_col = C_TEXT if unlocked else C_TEXT_DIM
-            draw_text(self.screen, self.font_shop_item, wdef.name, (rect.x + 14, rect.y + 12), title_col, shadow=False)
-            draw_text(self.screen, self.font_shop_desc, wdef.desc, (rect.x + 14, rect.y + 40), C_TEXT_DIM, shadow=False)
+            if level >= MAX_MASTERY_LEVEL:
+                draw_text(self.screen, self.font_shop_small, "MASTERED", (rect.right - 110, rect.y + 10), C_OK, shadow=False)
+                pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
+                pygame.draw.rect(self.screen, C_OK, pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
+            else:
+                req_kills, req_games = mastery_requirements(level + 1)
+                kill_frac = clamp(kills / max(1, req_kills), 0, 1)
+                game_frac = clamp(games / max(1, req_games), 0, 1)
 
-            extra = ""
-            if wdef.splash_radius > 0:
-                extra += " SPLASH"
-            if wdef.chain > 0:
-                extra += " CHAIN"
-            if getattr(wdef, "base_pierce", 0) > 0:
-                extra += f" PIERCE+{wdef.base_pierce}"
+                draw_text(self.screen, self.font_tiny, f"Kills {kills}/{req_kills}", (bar_x, bar_y - 14), C_TEXT_DIM, shadow=False)
+                pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=6)
+                pygame.draw.rect(self.screen, C_ACCENT, pygame.Rect(bar_x, bar_y, int(bar_w * kill_frac), bar_h), border_radius=6)
 
-            stats = f"DMG {wdef.base_damage}  CD {wdef.fire_cd:.2f}s{extra}"
-            draw_text(self.screen, self.font_shop_small, stats, (rect.x + 14, rect.y + 74), C_ACCENT if unlocked else C_TEXT_DIM, shadow=False)
+                bar_y2 = bar_y + 16
+                draw_text(self.screen, self.font_tiny, f"Games {games}/{req_games}", (bar_x, bar_y2 - 14), C_TEXT_DIM, shadow=False)
+                pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y2, bar_w, bar_h), border_radius=6)
+                pygame.draw.rect(self.screen, C_ACCENT_2, pygame.Rect(bar_x, bar_y2, int(bar_w * game_frac), bar_h), border_radius=6)
+    def draw_weapons(self, events):
+        self.screen.fill(C_BG)
+        cx = WIDTH // 2
 
-            badge = pygame.Rect(rect.right - 110, rect.y + 10, 96, 28)
-            if equipped:
-                pygame.draw.rect(self.screen, (*C_OK, 230), badge, border_radius=10)
-                pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=10)
-                rect_centered_text(self.screen, self.font_shop_small, "EQUIPPED", badge, (10, 20, 20), shadow=False)
-            elif not unlocked:
-                pygame.draw.rect(self.screen, (*C_TEXT_DIM, 180), badge, border_radius=10)
-                pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=10)
-                rect_centered_text(self.screen, self.font_shop_small, "LOCKED", badge, (25, 25, 32), shadow=False)
+        # countdown any hint toast
+        self.weapon_notice_timer = max(0.0, self.weapon_notice_timer - (1 / 60))
+
+        draw_text(self.screen, self.font_shop_title, "WEAPONS", (cx, 62), C_TEXT, center=True)
+        subtitle = "Pick an unlocked troop (buy more in Shop → WEAPONS)." if self.weapons_view == "weapons" else "Mastery is visual only (no bonuses yet)."
+        draw_text(self.screen, self.font_ui, subtitle,
+                  (cx, 94), C_TEXT_DIM, center=True, shadow=False)
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+
+        for tab in self.weapon_tabs:
+            tab.update(mouse_pos, mouse_down)
+            tab.draw(self.screen, self.font_shop_item, active=(tab.tab_id == self.weapons_view))
+
+        box = pygame.Rect(70, 160, WIDTH - 140, HEIGHT - 255)
+        pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
+
+        if self.weapons_view == "mastery":
+            self.draw_weapon_mastery(box, mouse_pos, mouse_down, events)
+        else:
+            cols = 3
+            rows = 3  # ✅ force 3 rows => 9 cards per page
+
+            gap_x = 10
+            gap_y = 12
+            pad = 14
+
+            # Compute card sizes so 3x3 fits perfectly in the box
+            usable_w = box.w - pad * 2
+            usable_h = box.h - pad * 2
+
+            card_w = (usable_w - gap_x * (cols - 1)) // cols
+            card_h = (usable_h - gap_y * (rows - 1)) // rows
+
+            cards_per_page = cols * rows
+
+            weapon_ids = list(WEAPONS.keys())  # insertion order; new weapons auto included
+            total_pages = max(1, math.ceil(len(weapon_ids) / cards_per_page))
+            self.weapon_page = int(clamp(self.weapon_page, 0, total_pages - 1))
+
+            start = self.weapon_page * cards_per_page
+            end = start + cards_per_page
+            page_ids = weapon_ids[start:end]
+
+            # enable/disable buttons
+            self.weapon_prev_btn.enabled = self.weapon_page > 0
+            self.weapon_next_btn.enabled = (self.weapon_page + 1) < total_pages
+
+            start_x = box.x + pad
+            start_y = box.y + pad
+
+            for i, wid in enumerate(page_ids):
+                c = i % cols
+                r = i // cols
+                rect = pygame.Rect(
+                    start_x + c * (card_w + gap_x),
+                    start_y + r * (card_h + gap_y),
+                    card_w,
+                    card_h
+                )
+
+                wdef = WEAPONS[wid]
+                unlocked = bool(self.save.weapon_unlocks.get(wid, False))
+                equipped = (self.save.selected_weapon == wid) and unlocked
+
+                hover = rect.collidepoint(mouse_pos)
+                if hover and mouse_down:
+                    if unlocked:
+                        self.save.selected_weapon = wid
+                        self.save.save()
+                        self.audio_play("buy")
+                    else:
+                        self.weapon_notice_text = "LOCKED — buy it in SHOP → WEAPONS"
+                        self.weapon_notice_timer = 1.2
+                        self.audio_play("hit")
+
+                bg = (*C_PANEL_2, 245) if unlocked else (*C_PANEL_2, 190)
+                edge = C_ACCENT if hover else C_WALL_EDGE
+                pygame.draw.rect(self.screen, bg, rect, border_radius=14)
+                pygame.draw.rect(self.screen, edge, rect, 2, border_radius=14)
+
+                title_col = C_TEXT if unlocked else C_TEXT_DIM
+                draw_text(self.screen, self.font_shop_item, wdef.name, (rect.x + 14, rect.y + 12), title_col, shadow=False)
+                draw_text(self.screen, self.font_shop_desc, wdef.desc, (rect.x + 14, rect.y + 40), C_TEXT_DIM, shadow=False)
+
+                extra = ""
+                if wdef.splash_radius > 0:
+                    extra += " SPLASH"
+                if wdef.chain > 0:
+                    extra += " CHAIN"
+                if getattr(wdef, "base_pierce", 0) > 0:
+                    extra += f" PIERCE+{wdef.base_pierce}"
+
+                stats = f"DMG {wdef.base_damage}  CD {wdef.fire_cd:.2f}s{extra}"
+                draw_text(self.screen, self.font_shop_small, stats, (rect.x + 14, rect.y + 74), C_ACCENT if unlocked else C_TEXT_DIM, shadow=False)
+
+                badge = pygame.Rect(rect.right - 110, rect.y + 10, 96, 28)
+                if equipped:
+                    pygame.draw.rect(self.screen, (*C_OK, 230), badge, border_radius=10)
+                    pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=10)
+                    rect_centered_text(self.screen, self.font_shop_small, "EQUIPPED", badge, (10, 20, 20), shadow=False)
+                elif not unlocked:
+                    pygame.draw.rect(self.screen, (*C_TEXT_DIM, 180), badge, border_radius=10)
+                    pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=10)
+                    rect_centered_text(self.screen, self.font_shop_small, "LOCKED", badge, (25, 25, 32), shadow=False)
 
         # Back + pagination buttons
         self.weapon_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
@@ -3004,57 +3678,176 @@ class Game:
             tab.draw(self.screen, self.font_shop_item, active=(tab.tab_id == self.shop_tab))
 
         box = pygame.Rect(70, 175, WIDTH - 140, HEIGHT - 270)
-        pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
-        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
-
-        items = self._shop_items_for_tab()
+        if self.shop_tab != "cosmetics":
+            pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
         if self.shop_tab == "cosmetics":
-            y = box.y + 18
-            pad = 18
-            card_w = box.w - 36
-            card_h = 84
+            cosmetic_box = pygame.Rect(70, 175, WIDTH - 140, HEIGHT - 330)
+            pygame.draw.rect(self.screen, (*C_PANEL, 235), cosmetic_box, border_radius=16)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), cosmetic_box, 2, border_radius=16)
 
-            def draw_toggle_card(title, desc, value_on, on_click):
-                nonlocal y
-                rect = pygame.Rect(box.x + pad, y, card_w, card_h)
-                y += card_h + 14
-                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=14)
-                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), rect, 2, border_radius=14)
-                draw_text(self.screen, self.font_shop_item, title, (rect.x + 14, rect.y + 10), C_TEXT, shadow=False)
-                draw_text(self.screen, self.font_shop_desc, desc, (rect.x + 14, rect.y + 38), C_TEXT_DIM, shadow=False)
+            cosmetics = COSMETICS
+            rows_per_page = self._shop_rows_per_page(cosmetic_box)
+            total_pages = max(1, math.ceil(len(cosmetics) / max(1, rows_per_page)))
+            self.shop_page = clamp(self.shop_page, 0, total_pages - 1)
 
-                badge = pygame.Rect(rect.right - 132, rect.y + 22, 110, 40)
-                pygame.draw.rect(self.screen, (*C_OK, 220) if value_on else (*C_TEXT_DIM, 160), badge, border_radius=12)
-                pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=12)
-                rect_centered_text(self.screen, self.font_shop_small, "ON" if value_on else "OFF", badge,
+            start = self.shop_page * rows_per_page
+            end = start + rows_per_page
+            page_items = cosmetics[start:end]
+
+            has_prev = self.shop_page > 0
+            has_next = (self.shop_page + 1) < total_pages
+            self.shop_prev_btn.enabled = has_prev
+            self.shop_next_btn.enabled = has_next
+
+            x0 = cosmetic_box.x + 18
+            y = cosmetic_box.y + 14
+
+            row_h = 70
+            gap = 12
+            row_w = cosmetic_box.w - 36
+
+            for cosmetic in page_items:
+                row = pygame.Rect(x0, y, row_w, row_h)
+                y += (row_h + gap)
+
+                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), row, border_radius=12)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), row, 2, border_radius=12)
+
+                unlocked = bool(self.save.cosmetics_unlocked.get(cosmetic.id, False))
+                equipped = self.save.cosmetics_equipped.get(cosmetic.category) == cosmetic.id
+                status = "Owned" if unlocked else ("Bundle Exclusive" if cosmetic.bundle_only else "Locked")
+                cost_txt = "--" if unlocked else f"{cosmetic.cost} coins"
+                cat_txt = cosmetic.category.upper()
+
+                draw_text(self.screen, self.font_shop_item, f"{cosmetic.name}  •  {cat_txt}", (row.x + 14, row.y + 10), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_shop_desc, cosmetic.desc, (row.x + 14, row.y + 38), C_TEXT_DIM, shadow=False)
+                draw_text(self.screen, self.font_shop_small, status, (row.right - 310, row.y + 14),
+                          C_OK if unlocked else C_TEXT_DIM, shadow=False)
+                draw_text(self.screen, self.font_shop_small, cost_txt, (row.right - 310, row.y + 38), C_COIN, shadow=False)
+
+                action_rect = pygame.Rect(row.right - 120, row.y + 16, 100, 38)
+                if equipped:
+                    pygame.draw.rect(self.screen, (*C_OK, 220), action_rect, border_radius=10)
+                    pygame.draw.rect(self.screen, C_WALL_EDGE, action_rect, 2, border_radius=10)
+                    rect_centered_text(self.screen, self.font_shop_small, "EQUIPPED", action_rect, (10, 20, 20), shadow=False)
+                else:
+                    label = "Equip" if unlocked else ("Bundle" if cosmetic.bundle_only else "Buy")
+                    btn = Button(action_rect, label, callback=lambda c=cosmetic: self.equip_cosmetic(c) if self.save.cosmetics_unlocked.get(c.id, False) else self.buy_cosmetic(c))
+                    btn.enabled = unlocked or (not cosmetic.bundle_only and self.save.coins >= cosmetic.cost)
+                    btn.update(1 / 60, mouse_pos, mouse_down, events)
+                    btn.draw(self.screen, self.font_shop_small)
+
+            options_box = pygame.Rect(70, cosmetic_box.bottom + 12, WIDTH - 140, 86)
+            pygame.draw.rect(self.screen, (*C_PANEL, 235), options_box, border_radius=14)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), options_box, 2, border_radius=14)
+            draw_text(self.screen, self.font_shop_small, "OPTIONS", (options_box.x + 14, options_box.y + 10), C_TEXT_DIM, shadow=False)
+
+            opt_w = 220
+            opt_h = 46
+            opt_y = options_box.y + 30
+            opt_gap = 16
+            opt_x = options_box.x + 12
+
+            def draw_option(label, value_on, on_click, x):
+                rect = pygame.Rect(x, opt_y, opt_w, opt_h)
+                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=12)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), rect, 2, border_radius=12)
+                draw_text(self.screen, self.font_shop_small, label, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
+                badge = pygame.Rect(rect.right - 60, rect.y + 8, 48, 28)
+                pygame.draw.rect(self.screen, (*C_OK, 220) if value_on else (*C_TEXT_DIM, 160), badge, border_radius=8)
+                pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=8)
+                rect_centered_text(self.screen, self.font_tiny, "ON" if value_on else "OFF", badge,
                                    (10, 20, 20) if value_on else (25, 25, 32), shadow=False)
-
                 if rect.collidepoint(mouse_pos) and mouse_down:
                     on_click()
 
-            draw_toggle_card(
-                "Alternate Outline",
-                "Cosmetic: changes player outline color.",
-                bool(self.save.cosmetic_outline_alt),
-                self.toggle_cosmetic
-            )
-            draw_toggle_card(
-                "Screen Shake",
-                "Toggle camera shake on hits/explosions.",
-                bool(self.save.settings.get("shake", True)),
-                lambda: self.toggle_setting("shake")
-            )
-            draw_toggle_card(
-                "Audio",
-                "Toggle sound effects.",
-                bool(self.save.settings.get("audio", True)),
-                lambda: self.toggle_setting("audio")
-            )
+            draw_option("Screen Shake", bool(self.save.settings.get("shake", True)), lambda: self.toggle_setting("shake"), opt_x)
+            draw_option("Audio", bool(self.save.settings.get("audio", True)), lambda: self.toggle_setting("audio"), opt_x + opt_w + opt_gap)
 
             self.shop_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
             self.shop_back_btn.draw(self.screen, self.font_med)
+
+            self.shop_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_prev_btn.draw(self.screen, self.font_med)
+            self.shop_next_btn.draw(self.screen, self.font_med)
+
+            page_txt = f"Page {self.shop_page + 1}/{total_pages}"
+            mid_x = (self.shop_prev_btn.rect.centerx + self.shop_next_btn.rect.centerx) // 2
+            below_y = self.shop_prev_btn.rect.bottom + 10
+            draw_text(self.screen, self.font_tiny, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
             return
+
+        if self.shop_tab == "bundles":
+            items = BUNDLES
+            rows_per_page = self._shop_rows_per_page(box)
+            total_pages = max(1, math.ceil(len(items) / max(1, rows_per_page)))
+            self.shop_page = clamp(self.shop_page, 0, total_pages - 1)
+
+            start = self.shop_page * rows_per_page
+            end = start + rows_per_page
+            page_items = items[start:end]
+
+            has_prev = self.shop_page > 0
+            has_next = (self.shop_page + 1) < total_pages
+            self.shop_prev_btn.enabled = has_prev
+            self.shop_next_btn.enabled = has_next
+
+            x0 = box.x + 18
+            y = box.y + 14
+
+            row_h = 86
+            gap = 12
+            row_w = box.w - 36
+
+            for bundle in page_items:
+                row = pygame.Rect(x0, y, row_w, row_h)
+                y += (row_h + gap)
+
+                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), row, border_radius=12)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), row, 2, border_radius=12)
+
+                owned = self.bundle_is_owned(bundle)
+                cost = self.bundle_price(bundle)
+                includes = []
+                includes += [WEAPONS[w].name for w in bundle.weapons if w in WEAPONS]
+                includes += [SHOP_ITEMS_BY_ID[m].name for m in bundle.meta if m in SHOP_ITEMS_BY_ID]
+                includes += [COSMETICS_BY_ID[c].name for c in bundle.cosmetics if c in COSMETICS_BY_ID]
+                includes_txt = ", ".join(includes) if includes else "Bundle contents"
+
+                draw_text(self.screen, self.font_shop_item, bundle.name, (row.x + 14, row.y + 10), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_shop_desc, bundle.desc, (row.x + 14, row.y + 38), C_TEXT_DIM, shadow=False)
+                draw_text(self.screen, self.font_shop_small, includes_txt, (row.x + 14, row.y + 62), C_TEXT_DIM, shadow=False)
+
+                status_txt = "OWNED" if owned else f"{int(bundle.discount * 100)}% off"
+                draw_text(self.screen, self.font_shop_small, status_txt, (row.right - 310, row.y + 16),
+                          C_OK if owned else C_TEXT_DIM, shadow=False)
+                cost_txt = "OWNED" if owned else f"{cost} coins"
+                draw_text(self.screen, self.font_shop_small, cost_txt, (row.right - 310, row.y + 44), C_COIN, shadow=False)
+
+                buy_rect = pygame.Rect(row.right - 110, row.y + 22, 92, 40)
+                btn = Button(buy_rect, "Buy", callback=lambda b=bundle: self.buy_bundle(b))
+                btn.enabled = (not owned) and (self.save.coins >= cost) and cost > 0
+                btn.update(1 / 60, mouse_pos, mouse_down, events)
+                btn.draw(self.screen, self.font_shop_small)
+
+            self.shop_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_back_btn.draw(self.screen, self.font_med)
+
+            self.shop_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_prev_btn.draw(self.screen, self.font_med)
+            self.shop_next_btn.draw(self.screen, self.font_med)
+
+            page_txt = f"Page {self.shop_page + 1}/{total_pages}"
+            mid_x = (self.shop_prev_btn.rect.centerx + self.shop_next_btn.rect.centerx) // 2
+            below_y = self.shop_prev_btn.rect.bottom + 10
+            draw_text(self.screen, self.font_tiny, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
+            return
+
+        items = self._shop_items_for_tab()
 
         rows_per_page = self._shop_rows_per_page(box)
         total_pages = max(1, math.ceil(len(items) / max(1, rows_per_page)))
@@ -3253,6 +4046,9 @@ class Game:
 
             elif self.state == "leaderboard":
                 self.draw_leaderboard(events)
+
+            elif self.state == "challenges":
+                self.draw_challenges(events)
 
             elif self.state == "paused":
                 self.update_camera(dt)

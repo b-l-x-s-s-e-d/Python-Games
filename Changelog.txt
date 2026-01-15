@@ -70,11 +70,18 @@ v1.3.4
 3. Fixed a bug where the game would crash upon opening
 
 v1.4
-1. Added "Bundles" to the shop
-2. Added more cosmetics like trails and bullet colours
-3. Added daily and weekly challenges
-4. Added weapon mastery system
-5. Fixed "Leaderboard" tab not appearing on the main menu
+New Features
+1. Added a new Shop tab for Bundles with discounted one-time packs
+2. Expanded Cosmetics with outline styles, bullet colors, trails, and explosion styles (including bundle exclusives)
+3. Added Daily + Weekly Challenges with automatic resets and instant coin rewards
+4. Added a Weapon Mastery view that tracks kills, hits, games, and mastery levels
+
+Improvements
+1. Weapons screen now includes a Mastery toggle without adding new menu clutter
+2. Main menu now includes a compact Challenges shortcut
+
+Internal / Prep
+1. Save data extended for bundles, cosmetics, challenges, and weapon mastery
 
 To-Do Features:
 1. Enable fullscreen mode.
