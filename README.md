@@ -1,8 +1,8 @@
 # 🚀 Tank Game 🚀
 
-Getting Started
+## Getting Started
 
-To run the Tank Game correctly and ensure your progress saves, you **must clone or download the entire repository**. Downloading individual files may cause saving or other features to break.
+To run the Tank Game correctly and ensure your progress saves, you **must clone or download the entire repository**. Downloading individual files may cause issues with saving or other features.
 
 ## Installation
 
