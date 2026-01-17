@@ -115,8 +115,8 @@ Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
 Bug Fixes
 URGENT FIXES!!!
-1. Bundles having extremely low prices for their contents
-2. Equipping a cosmetic and being unable to unequip it
+1.
+
 
 
 
