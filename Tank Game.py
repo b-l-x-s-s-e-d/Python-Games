@@ -2991,7 +2991,7 @@ class Game:
                         # no pierce left -> now explode (if it has splash) and end the bullet
                         if b.splash_radius > 0:
                             self._rocket_explode(b)
-                    b.life = 0
+                        b.life = 0
                     break
     def _handle_enemy_bullet_player_collisions(self):
         if self.player.invulnerable():
