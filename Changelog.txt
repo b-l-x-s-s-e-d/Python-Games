@@ -97,6 +97,13 @@ Imrpovements
 3. Mastery adjustments
 4. Working on adding Story Mode into the game :3
 
+v1.4.3
+Bug Fixes
+1. Fixed piercing upgrades not working on some tanks
+2. Reduced coins earned from doing challenges
+3. Prevented bundles from being able to sell duplicate weapons
+4. Added 1 more bundle option to the shop
+
 
 To-Do Features
 New Features
@@ -109,6 +116,7 @@ Improvements
 2. Fix UI for the Mastery tab
 Bug Fixes
 1.
+
 
 
 
