@@ -74,8 +74,8 @@ Bug Fixes
 2. Fixed a bug where the game would crash upon opening
 
 
-v1.4
-New Features -- Progression and Shop Update
+v1.4 -- Progression and Shop Update
+New Features
 1. Added a new Shop tab for Bundles
 2. Expanded Cosmetics with explosion styles, bullet colour, and more
 3. Added Daily and Weekly Challenges
@@ -137,6 +137,7 @@ Bug Fixes
 
 URGENT FIXES!!!
 1. Remove the cyan overlay in the leaderboard tab and change the 1., 2., 3., numbers to white
+
 
 
 
