@@ -565,21 +565,7 @@ class Button:
         surf.blit(base, self.rect.topleft)
 
         txt_col = C_TEXT if self.enabled else (120, 130, 155)
-        lines = self.text.split("\n")
-        line_height = font.get_linesize()
-        total_height = line_height * len(lines)
-        start_y = self.rect.centery - total_height // 2 + line_height // 2
-        for idx, line in enumerate(lines):
-            display_line = clamp_text(font, line, self.rect.width - 12)
-            draw_text(
-                surf,
-                font,
-                display_line,
-                (self.rect.centerx, start_y + idx * line_height),
-                txt_col,
-                center=True,
-                shadow=True,
-            )
+        draw_text(surf, font, self.text, self.rect.center, txt_col, center=True, shadow=True)
 
 
 class TabButton:
@@ -1630,13 +1616,7 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption(TITLE)
-        try:
-            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        except pygame.error:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
-            pygame.display.quit()
-            pygame.display.init()
-            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
 
         # Fonts
@@ -1721,7 +1701,6 @@ class Game:
         # UI
         self.menu_buttons: List[Button] = []
         self.menu_challenges_btn: Optional[Button] = None
-        self.menu_quit_btn: Optional[Button] = None
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
@@ -1814,30 +1793,27 @@ class Game:
     # ---------------- UI build ----------------
     def _build_menus(self):
         cx = WIDTH // 2
-        bw, bh = 360, 56
-        gap_y = 18
-        stack_y = 260
+        bw, bh = 340, 56
+        top = 278
+        gap = 68
 
-        menu_actions = [
-            ("Start Run", self.start_run),
-            ("Weapons", self.open_weapons_screen),
-            ("Shop", self.open_shop),
-            ("Settings", self.open_settings),
-            ("Leaderboard", self.open_leaderboard),
+        self.menu_buttons = [
+            Button(pygame.Rect(cx - bw // 2, top + gap * 0, bw, bh), "Start Run", self.start_run),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 1, bw, bh), "Weapons", self.open_weapons_screen),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 2, bw, bh), "Shop", self.open_shop),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Settings", self.open_settings),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 4, bw, bh), "Leaderboard", self.open_leaderboard),
         ]
-
-        self.menu_buttons = []
-        for idx, (label, callback) in enumerate(menu_actions):
-            x = cx - bw // 2
-            y = stack_y + idx * (bh + gap_y)
-            self.menu_buttons.append(Button(pygame.Rect(x, y, bw, bh), label, callback))
-
-        self.menu_challenges_btn = Button(
-            pygame.Rect(WIDTH - 240, 30, 200, 44),
-            "Challenges",
-            self.open_challenges,
+        self.menu_quit_btn = Button(
+            pygame.Rect(20, 18, 54, 48),
+            "X",
+            self.quit_game
         )
-        self.menu_quit_btn = Button(pygame.Rect(30, 30, 60, 44), "X", self.quit_game)
+        self.menu_challenges_btn = Button(
+            pygame.Rect(WIDTH - 170, 20, 150, 40),
+            "Challenges",
+            lambda: self.set_state("challenges")
+        )
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
@@ -3517,21 +3493,21 @@ class Game:
         mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
         for b in self.menu_buttons:
             b.update(1 / 60, mouse_pos, mouse_down, events)
-            b.draw(self.screen, self.font_small)
+            b.draw(self.screen, self.font_med)
 
         if self.menu_challenges_btn:
             self.menu_challenges_btn.update(1 / 60, mouse_pos, mouse_down, events)
             self.menu_challenges_btn.draw(self.screen, self.font_small)
 
-        if self.menu_quit_btn:
-            self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.menu_quit_btn.draw(self.screen, self.font_small)
+        # Top-left X quit button
+        self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
+        self.menu_quit_btn.draw(self.screen, self.font_med)
 
 
         controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot"
         controls2 = "Space to dash • F to toggle auto-fire • ESC to pause"
-        draw_text(self.screen, self.font_small, controls1, (cx, HEIGHT - 34), C_TEXT_DIM, center=True, shadow=False)
-        draw_text(self.screen, self.font_small, controls2, (cx, HEIGHT - 14), C_TEXT_DIM, center=True, shadow=False)
+        draw_text(self.screen, self.font_small, controls1, (cx, HEIGHT - 44), C_TEXT_DIM, center=True, shadow=False)
+        draw_text(self.screen, self.font_small, controls2, (cx, HEIGHT - 24), C_TEXT_DIM, center=True, shadow=False)
 
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
@@ -4379,9 +4355,3 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
-
-
-
-
-
-
