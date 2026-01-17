@@ -113,9 +113,11 @@ New Features
 4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
-2. Fix UI for the Mastery tab
 Bug Fixes
-1.
+URGENT FIXES!!!
+1. Bundles having extremely low prices for their contents
+2. Equipping a cosmetic and being unable to unequip it
+
 
 
 
