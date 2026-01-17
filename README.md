@@ -1,4 +1,37 @@
-1. Download BOTH the Tank Game.py file AND the save.json file, as the save.json file is needed if you want your progress to save
-2. Drag BOTH the Tank Game.py and the save.json to your desktop/anywhere on your PC. Make sure they are both in the same location!!
-3. Run the Tank Game.py, and any progress made should automatically update the save.json file, resulting in saved progress
-4. If you want to edit the save.json file, I can't stop you, but it ruins the fun of the game, so there's no point :3
+🚀 Tank Game 🚀
+
+Getting Started
+
+To run the Tank Game correctly and ensure your progress saves, you **must clone or download the entire repository**. Downloading individual files may cause saving or other features to break.
+
+## Installation
+
+1. **Clone or download the full repository**
+   - Click **Code → Download ZIP**, or
+   - Clone using Git:
+     ```
+     git clone <repository-url>
+     ```
+   Make sure **all files and folders** are included.
+   
+3. **Keep all files together**
+   - Do NOT move `Tank Game.py` out of the repository folder.
+   - Files such as `save.json` must remain in the same directory structure.
+  
+4. **Run the game**
+   - Open `Tank Game.py` using Python.
+   - Any progress you make will automatically update `save.json`.
+
+## Saving Progress
+
+- All progress (stats, unlocks, upgrades, etc.) is stored in `save.json`.
+- As long as the file remains in the repository folder, your progress will persist between runs.
+
+## ⚠️ Editing save.json
+
+You *can* manually edit `save.json`, but doing so removes the challenge and intended progression of the game.
+Play it normally for the best experience 🙂
+
+---
+
+Enjoy the game!
