@@ -1,6 +1,6 @@
 # Tank Game Changelog
 
-
+---
 
 ## Archived Updates
 - v1.1  
@@ -181,4 +181,5 @@
 
 - Remove the cyan overlay in the Leaderboard tab
 - Change 1st, 2nd, and 3rd place numbers to white
+
 
