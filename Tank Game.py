@@ -1326,7 +1326,7 @@ BUNDLES = [
     BundleDef(
         "starter_arsenal",
         "Starter Arsenal",
-        "Cannon + Burst Rifle + +1 Max HP at a starter discount.",
+        "A discounted mix of core firepower and extra durability.",
         weapons=["cannon", "burst"],
         meta=["meta_hp"],
         cosmetics=[],
@@ -1335,7 +1335,7 @@ BUNDLES = [
     BundleDef(
         "speed_demon",
         "Speed Demon",
-        "Minigun + Move Speed + Dash CDR to keep you fast.",
+        "A fast-paced bundle built for mobility and rapid fire.",
         weapons=["minigun"],
         meta=["meta_move", "meta_dash"],
         cosmetics=["bullet_mint"],
@@ -1344,11 +1344,20 @@ BUNDLES = [
     BundleDef(
         "heavy_metal",
         "Heavy Metal",
-        "Tank + Armor core + exclusive Steel cosmetics.",
+        "High-impact gear paired with rugged upgrades and exclusive cosmetics.",
         weapons=["tank"],
         meta=["armor"],
         cosmetics=["outline_steel", "explosion_magma"],
         discount=0.22,
+    ),
+    BundleDef(
+        "arc_surge",
+        "Arc Surge",
+        "A shocking bundle of experimental firepower and charged visuals.",
+        weapons=["tesla", "electricity"],
+        meta=["meta_bulletspeed"],
+        cosmetics=["bullet_violet", "trail_ion"],
+        discount=0.20,
     ),
 ]
 
@@ -1956,17 +1965,36 @@ class Game:
         self.audio_play("buy")
 
     # ---------------- Bundles ----------------
+    def resolve_bundle_items(self, bundle: BundleDef) -> Tuple[List[str], List[str], List[str]]:
+        available_weapons = [
+            wid for wid in WEAPONS.keys() if not self.save.weapon_unlocks.get(wid, False)
+        ]
+        resolved_weapons: List[str] = []
+        remaining_pool = [wid for wid in available_weapons if wid not in bundle.weapons]
+        for wid in bundle.weapons:
+            if not self.save.weapon_unlocks.get(wid, False):
+                if wid not in resolved_weapons:
+                    resolved_weapons.append(wid)
+                if wid in remaining_pool:
+                    remaining_pool.remove(wid)
+                continue
+            replacement = remaining_pool.pop(0) if remaining_pool else None
+            if replacement:
+                resolved_weapons.append(replacement)
+        return resolved_weapons, list(bundle.meta), list(bundle.cosmetics)
+
     def bundle_base_value(self, bundle: BundleDef) -> int:
         total = 0
-        for wid in bundle.weapons:
+        weapons, meta, cosmetics = self.resolve_bundle_items(bundle)
+        for wid in weapons:
             item = SHOP_ITEMS_BY_WEAPON.get(wid)
             if item:
                 total += item.base_cost
-        for mid in bundle.meta:
+        for mid in meta:
             item = SHOP_ITEMS_BY_ID.get(mid)
             if item:
                 total += item.base_cost
-        for cid in bundle.cosmetics:
+        for cid in cosmetics:
             cosmetic = COSMETICS_BY_ID.get(cid)
             if cosmetic:
                 total += cosmetic.cost
@@ -1974,17 +2002,18 @@ class Game:
 
     def bundle_owned_value(self, bundle: BundleDef) -> int:
         owned = 0
-        for wid in bundle.weapons:
+        weapons, meta, cosmetics = self.resolve_bundle_items(bundle)
+        for wid in weapons:
             if self.save.weapon_unlocks.get(wid, False):
                 item = SHOP_ITEMS_BY_WEAPON.get(wid)
                 if item:
                     owned += item.base_cost
-        for mid in bundle.meta:
+        for mid in meta:
             if int(self.save.shop_levels.get(mid, 0)) > 0:
                 item = SHOP_ITEMS_BY_ID.get(mid)
                 if item:
                     owned += item.base_cost
-        for cid in bundle.cosmetics:
+        for cid in cosmetics:
             if self.save.cosmetics_unlocked.get(cid, False):
                 cosmetic = COSMETICS_BY_ID.get(cid)
                 if cosmetic:
@@ -2001,7 +2030,9 @@ class Game:
         if self.save.bundles_purchased.get(bundle.id, False):
             return True
         base_value = self.bundle_base_value(bundle)
-        return self.bundle_owned_value(bundle) >= base_value and base_value > 0
+        if base_value <= 0:
+            return True
+        return self.bundle_owned_value(bundle) >= base_value
 
     def buy_bundle(self, bundle: BundleDef):
         if self.bundle_is_owned(bundle):
@@ -2010,15 +2041,16 @@ class Game:
         if cost <= 0 or self.save.coins < cost:
             return
         self.save.coins -= cost
-        for wid in bundle.weapons:
+        weapons, meta, cosmetics = self.resolve_bundle_items(bundle)
+        for wid in weapons:
             self.save.weapon_unlocks[wid] = True
-        for mid in bundle.meta:
+        for mid in meta:
             item = SHOP_ITEMS_BY_ID.get(mid)
             if not item:
                 continue
             current = int(self.save.shop_levels.get(mid, 0))
             self.save.shop_levels[mid] = min(item.max_level, current + 1)
-        for cid in bundle.cosmetics:
+        for cid in cosmetics:
             self.save.cosmetics_unlocked[cid] = True
         self.save.bundles_purchased[bundle.id] = True
         self.save.save()
@@ -2056,18 +2088,18 @@ class Game:
         rng = random.Random(key)
         weapon_ids = list(WEAPONS.keys())
         candidates = [
-            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 40 enemies.", "target": 40, "reward": 25, "metric": "kills"},
-            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 6 waves.", "target": 6, "reward": 15, "metric": "waves"},
-            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 1 run.", "target": 1, "reward": 10, "metric": "runs"},
+            {"id": "daily_kills", "name": "Clear the Field", "desc": "Defeat 60 enemies.", "target": 60, "reward": 20, "metric": "kills"},
+            {"id": "daily_waves", "name": "Hold the Line", "desc": "Survive 9 waves.", "target": 9, "reward": 10, "metric": "waves"},
+            {"id": "daily_run", "name": "Warm-Up Run", "desc": "Complete 2 runs.", "target": 2, "reward": 5, "metric": "runs"},
         ]
         weapon_pick = rng.choice(weapon_ids)
         weapon_name = WEAPONS[weapon_pick].name
         candidates.append({
             "id": f"daily_weapon_{weapon_pick}",
             "name": f"Weapon Focus: {weapon_name}",
-            "desc": f"Defeat 25 enemies using {weapon_name}.",
-            "target": 25,
-            "reward": 30,
+            "desc": f"Defeat 38 enemies using {weapon_name}.",
+            "target": 38,
+            "reward": 25,
             "metric": "weapon_kills",
             "weapon_id": weapon_pick,
         })
@@ -2085,10 +2117,10 @@ class Game:
     def _generate_weekly_challenges(self, key: str) -> List[Dict[str, object]]:
         rng = random.Random(key)
         candidates = [
-            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 3 bosses.", "target": 3, "reward": 140, "metric": "boss_kills"},
-            {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 9000 total damage.", "target": 9000, "reward": 130, "metric": "damage"},
-            {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 20.", "target": 20, "reward": 150, "metric": "high_wave"},
-            {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 8 runs.", "target": 8, "reward": 100, "metric": "runs"},
+            {"id": "weekly_boss", "name": "Boss Hunter", "desc": "Defeat 5 bosses.", "target": 5, "reward": 110, "metric": "boss_kills"},
+            {"id": "weekly_damage", "name": "Heavy Damage", "desc": "Deal 13500 total damage.", "target": 13500, "reward": 100, "metric": "damage"},
+            {"id": "weekly_wave", "name": "Deep Run", "desc": "Reach wave 30.", "target": 30, "reward": 120, "metric": "high_wave"},
+            {"id": "weekly_runs", "name": "Weekend Warrior", "desc": "Complete 12 runs.", "target": 12, "reward": 70, "metric": "runs"},
         ]
         count = rng.randint(1, 2)
         picks = rng.sample(candidates, count)
@@ -3945,13 +3977,14 @@ class Game:
                 pygame.draw.rect(self.screen, (*C_PANEL_2, 245), row, border_radius=12)
                 pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), row, 2, border_radius=12)
 
+                weapons, meta, cosmetics = self.resolve_bundle_items(bundle)
                 owned = self.bundle_is_owned(bundle)
                 cost = self.bundle_price(bundle)
                 includes = []
-                includes += [WEAPONS[w].name for w in bundle.weapons if w in WEAPONS]
-                includes += [SHOP_ITEMS_BY_ID[m].name for m in bundle.meta if m in SHOP_ITEMS_BY_ID]
-                includes += [COSMETICS_BY_ID[c].name for c in bundle.cosmetics if c in COSMETICS_BY_ID]
-                includes_txt = ", ".join(includes) if includes else "Bundle contents"
+                includes += [WEAPONS[w].name for w in weapons if w in WEAPONS]
+                includes += [SHOP_ITEMS_BY_ID[m].name for m in meta if m in SHOP_ITEMS_BY_ID]
+                includes += [COSMETICS_BY_ID[c].name for c in cosmetics if c in COSMETICS_BY_ID]
+                includes_txt = ", ".join(includes) if includes else "No bundle items available"
 
                 draw_text(self.screen, self.font_shop_item, bundle.name, (row.x + 14, row.y + 10), C_TEXT, shadow=False)
                 draw_text(self.screen, self.font_shop_desc, bundle.desc, (row.x + 14, row.y + 38), C_TEXT_DIM, shadow=False)
