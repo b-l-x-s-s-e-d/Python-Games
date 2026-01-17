@@ -117,9 +117,12 @@ Improvements
 Bug Fixes
 1. Fixed piercing upgrades not working on some tanks
 
-v1.5.1 -- 
+v1.5.1 -- Game Code Improvements
 New Features
 1. Update names added to all versions
+Improvements
+1. Removed unnecessary lines from game code
+2. Added more comments to the game code
 
 
 To-Do Features
@@ -137,6 +140,7 @@ Bug Fixes
 
 URGENT FIXES!!!
 1. Remove the cyan overlay in the leaderboard tab and change the 1., 2., 3., numbers to white
+
 
 
 
