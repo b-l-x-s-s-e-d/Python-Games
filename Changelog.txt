@@ -105,12 +105,13 @@ Improvements
 2. Prevented bundles from being able to sell duplicate weapons
 3. Fix some bundles having extremely low prices compared to their contents
 4. Fix being unable to unequip cosmetics after equipping them
-5. Revamped the Cosmetics tab:
+5. Redesigned the Cosmetics tab:
    i) Remove the "Options" section from the bottom of the Cosmetics tab in the Shop
    ii) Extend the Cosmetics layout to fit 4 cosmetics per page
    iii) Separate cosmetics by category (e.g. bullets, outlines) so each has its own page
    iv) Add a new "Settings" tab to the main menu and move the removed Options there, along with additional settings
 6. I will now be giving names to my updates :D
+7. Slight design adjustments to the Leaderboard tab
 Bug Fixes
 1. Fixed piercing upgrades not working on some tanks
 
@@ -126,6 +127,7 @@ Improvements
 Bug Fixes
 URGENT FIXES!!!
 1.
+
 
 
 
