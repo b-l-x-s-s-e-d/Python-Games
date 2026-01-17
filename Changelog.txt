@@ -97,9 +97,11 @@ Improvements
 3. Mastery adjustments
 4. Working on adding Story Mode into the game :3
 
+
 v1.5 - Quality of Life Improvements
 New Features
 1. Added 1 more bundle option to the shop
+2. Story Mode will be added in v1.5.1 or v1.6!!
 Improvements
 1. Reduced coins earned from doing challenges
 2. Prevented bundles from being able to sell duplicate weapons
@@ -124,9 +126,14 @@ New Features
 4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
 Improvements
 1. Redesign the main menu title and the weapon/coins panel for improved presentation.
+2. Move the controls on the main menu to make them all 1 line (but still centred)
+3. Fix bundles overlapping the borders of the page
 Bug Fixes
+
+
 URGENT FIXES!!!
-1.
+1. Remove the cyan overlay in the leaderboard tab and change the 1., 2., 3., numbers to white
+
 
 
 
