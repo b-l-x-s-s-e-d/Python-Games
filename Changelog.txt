@@ -1,154 +1,183 @@
-TANK GAME CHANGELOG
+# Tank Game Changelog
 
-ARCHIVED UPDATES
-v1.1
-v1.2
-v1.2.1
-v1.2.2
-v1.2.3
+---
 
+## Archived Updates
+- v1.1  
+- v1.2  
+- v1.2.1  
+- v1.2.2  
+- v1.2.3  
 
-v1.2.4 -- Gameplay Balance Update
-New Features
-1. Working on a BIG update :3
-Gameplay
-1. Ranged enemy damage decreased from 3hp -> 2hp. And hard mode from 7hp -> 3hp
-2. Increased grace time after killing the boss from 2.5 -> 3
-3. Difficulty ramp time decreased
-4. Increased all powerup durations
-5. Max enemy limit decreased
-6. Increased coins-per-wave from 2 -> 4
+---
 
+## v1.2.4 — Gameplay Balance Update
 
-v1.3 -- Weapons and Gameplay Update
-New Features
-1. Added Flamethrower Tank
-2. Added Omni Pistol Tank
-3. Added Auto-Fire and a visual representation
-4. Added a Boss tracker that points towards the Boss (if applicable)
-Gameplay
-1. Increased Sniper bullet speed from 1450 -> 1500
-2. Decreased Sniper bullet radius from 4 -> 3
-3. Each wave lasts 13 seconds instead of 18
-4. Changed Boss's default damage from 6hp -> 2hp
-5. Changed Boss's bullet speed from 420 -> 310
-6. Reduced Tesla fire cooldown from 0.22 -> 0.21
+### New Features
+- Working on a BIG update :3
 
+### Gameplay
+- Ranged enemy damage decreased from **3 HP → 2 HP**  
+  - Hard mode: **7 HP → 3 HP**
+- Increased grace time after killing the boss from **2.5 → 3**
+- Difficulty ramp time decreased
+- Increased all powerup durations
+- Max enemy limit decreased
+- Coins per wave increased from **2 → 4**
 
-v1.3.1 -- Gameplay Update #2
-New Features
-1. Added Windscreen Wiper as an exclusive, limited, and OP Tank
-Gameplay
-1. Decreased Heal Orb heal from 2hp -> 1hp
-2. Decreased Omni Pistol damage from 11 -> 8
-3. Increased wave time from 13 -> 15
-4. Decreased Ranged enemy default damage from 2hp -> 1hp. And hard mode from 3hp -> 2hp
-5. Improved Boss death loot
-6. Increased Flamethrower bullet life from 0.35 -> 0.45
-Improvements
-1. Improved Boss tracker
-2. Improved Powerup tracker
+---
 
+## v1.3 — Weapons and Gameplay Update
 
-v1.3.2 -- Tank Balances Update
-New Features
-1. Added a Tank tank
-2. You can now crit enemies without an upgrade
-Gameplay
-1. Increased/fixed recoil on all tanks
-2. Increased Tank damage from 52hp -> 56hp
-3. Decreased Tank fire cooldown from 1.65 -> 1.5
+### New Features
+- Added **Flamethrower Tank**
+- Added **Omni Pistol Tank**
+- Added **Auto-Fire** with a visual indicator
+- Added a **Boss Tracker** that points toward the boss (when applicable)
 
+### Gameplay
+- Sniper bullet speed increased from **1450 → 1500**
+- Sniper bullet radius decreased from **4 → 3**
+- Wave duration reduced from **18s → 13s**
+- Boss default damage reduced from **6 HP → 2 HP**
+- Boss bullet speed reduced from **420 → 310**
+- Tesla fire cooldown reduced from **0.22 → 0.21**
 
-v1.3.3 -- Boss Balance Update
-Gameplay
-1. Decreased Boss default damage from 2hp -> 1hp
-2. Decreased Boss bullet speed from 310 -> 270
+---
 
+## v1.3.1 — Gameplay Update #2
 
-v1.3.4 -- Leaderboard Addition and Bug Fixes
-New Features
-1. Added a Leaderboard tab on the main menu, displaying players' top 10 runs
-Bug Fixes
-1. Fixed a bug where piercing would not work properly on the rocket and tank
-2. Fixed a bug where the game would crash upon opening
+### New Features
+- Added **Windscreen Wiper**, an exclusive, limited, and overpowered tank
 
+### Gameplay
+- Heal Orb healing reduced from **2 HP → 1 HP**
+- Omni Pistol damage reduced from **11 → 8**
+- Wave duration increased from **13s → 15s**
+- Ranged enemy damage reduced from **2 HP → 1 HP**  
+  - Hard mode: **3 HP → 2 HP**
+- Improved boss death loot
+- Flamethrower bullet life increased from **0.35 → 0.45**
 
-v1.4 -- Progression and Shop Update
-New Features
-1. Added a new Shop tab for Bundles
-2. Expanded Cosmetics with explosion styles, bullet colour, and more
-3. Added Daily and Weekly Challenges
-4. Added a Weapon Mastery tab
+### Improvements
+- Improved Boss Tracker
+- Improved Powerup Tracker
 
+---
 
-v1.4.1 -- UI Stability Update
-Improvements
-1. Fixed the Mastery tab from crashing upon opening
-2. Added 2 separate tabs for Daily and Weekly Challenges
-3. Fully fixed the UIs for the Challenges tab and the Cosmetics tab
-4. Rewrote the subtitle in the Mastery tab
+## v1.3.2 — Tank Balance Update
 
+### New Features
+- Added the **Tank Tank**
+- Enemies can now be critically hit **without a crit upgrade**
 
-v1.4.2 -- Progression Adjustments
-Improvements
-1. Fully fixed the Challenges and Mastery tab UIs
-2. Added a feature where you need to be at Wave 3 for it to be counted as a "Game Played" for Mastery
-3. Mastery adjustments
-4. Working on adding Story Mode into the game :3
+### Gameplay
+- Reworked and increased recoil on all tanks
+- Tank damage increased from **52 → 56**
+- Tank fire cooldown reduced from **1.65 → 1.5**
 
+---
 
-v1.5 -- Quality of Life Improvements
-New Features
-1. Added 1 more bundle option to the shop
-2. Story Mode will be added in v1.5.1 or v1.6!!
-Improvements
-1. Reduced coins earned from doing challenges
-2. Prevented bundles from being able to sell duplicate weapons
-3. Fix some bundles having extremely low prices compared to their contents
-4. Fix being unable to unequip cosmetics after equipping them
-5. Redesigned the Cosmetics tab:
-   i) Remove the "Options" section from the bottom of the Cosmetics tab in the Shop
-   ii) Extend the Cosmetics layout to fit 4 cosmetics per page
-   iii) Separate cosmetics by category (e.g. bullets, outlines) so each has its own page
-   iv) Add a new "Settings" tab to the main menu and move the removed Options there, along with additional settings
-6. I will now be giving names to my updates :D
-7. Slight design adjustments to the Leaderboard tab
-Bug Fixes
-1. Fixed piercing upgrades not working on some tanks
+## v1.3.3 — Boss Balance Update
 
-v1.5.1 -- Game Code Improvements
-New Features
-1. Update names added to all versions
-Improvements
-1. Removed unnecessary lines from game code
-2. Added more comments to the game code
+### Gameplay
+- Boss default damage reduced from **2 HP → 1 HP**
+- Boss bullet speed reduced from **310 → 270**
 
+---
 
-To-Do Features
-New Features
-1. Enable fullscreen mode.
-2. Add a Story Mode featuring level-based progression similar to Geometry Dash or Mario.
-3. Add a Kill Streak that gives extra rewards if you attack enemies without taking damage
-4. Add a Mini Map on the top-right corner in play that shows a mini version of the whole map
-Improvements
-1. Redesign the main menu title and the weapon/coins panel for improved presentation.
-2. Move the controls on the main menu to make them all 1 line (but still centred)
-3. Fix bundles overlapping the borders of the page
-Bug Fixes
+## v1.3.4 — Leaderboard & Bug Fixes
 
+### New Features
+- Added a **Leaderboard** tab to the main menu displaying top 10 runs
 
-URGENT FIXES!!!
-1. Remove the cyan overlay in the leaderboard tab and change the 1., 2., 3., numbers to white
+### Bug Fixes
+- Fixed piercing not working correctly on the Rocket and Tank
+- Fixed a crash occurring when opening the game
 
+---
 
+## v1.4 — Progression and Shop Update
 
+### New Features
+- Added a **Bundles** tab to the Shop
+- Expanded **Cosmetics** with explosion styles, bullet colours, and more
+- Added **Daily and Weekly Challenges**
+- Added a **Weapon Mastery** tab
 
+---
 
+## v1.4.1 — UI Stability Update
 
+### Improvements
+- Fixed Mastery tab crashing on open
+- Split Daily and Weekly Challenges into separate tabs
+- Fully fixed the Challenges and Cosmetics UIs
+- Rewrote the Mastery tab subtitle
 
+---
 
+## v1.4.2 — Progression Adjustments
 
+### Improvements
+- Fully fixed Challenges and Mastery UIs
+- A run now only counts as a “Game Played” for Mastery after reaching **Wave 3**
+- Additional Mastery balance adjustments
+- Story Mode currently in development :3
 
+---
 
+## v1.5 — Quality of Life Improvements
 
+### New Features
+- Added one additional bundle to the Shop
+- Story Mode planned for **v1.5.1 or v1.6**
+
+### Improvements
+- Reduced coins earned from Challenges
+- Prevented bundles from selling duplicate weapons
+- Fixed bundles with extremely low prices
+- Fixed being unable to unequip cosmetics
+- Redesigned the Cosmetics tab:
+  - Removed the Options section
+  - Extended layout to fit **4 cosmetics per page**
+  - Separated cosmetics by category
+  - Added a new **Settings** tab to the main menu
+- Update versions now have names
+- Minor visual improvements to the Leaderboard
+
+### Bug Fixes
+- Fixed piercing upgrades not working on some tanks
+
+---
+
+## v1.5.1 — Game Code Improvements
+
+### New Features
+- Added update names to all versions
+
+### Improvements
+- Removed unnecessary lines from the game code
+- Added more comments for readability
+
+---
+
+## To-Do Features
+
+### New Features
+- Fullscreen mode
+- Story Mode with level-based progression
+- Kill Streak system rewarding damage-free play
+- Mini Map displayed in the top-right during gameplay
+
+### Improvements
+- Redesign the main menu title and weapon/coins panel
+- Move main menu controls into a single centred line
+- Fix bundle UI overlapping page borders
+
+---
+
+## Urgent Fixes
+
+- Remove the cyan overlay in the Leaderboard tab
+- Change 1st, 2nd, and 3rd place numbers to white
