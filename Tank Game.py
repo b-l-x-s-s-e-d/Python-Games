@@ -3504,10 +3504,10 @@ class Game:
         self.menu_quit_btn.draw(self.screen, self.font_med)
 
 
-        controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot • Space to dash • F to toggle auto-fire • ESC to pause"
-      # controls2 = "Put controls here"
-        draw_text(self.screen, self.font_small, controls1, (cx, HEIGHT - 44), C_TEXT_DIM, center=True, shadow=False)
-      # draw_text(self.screen, self.font_small, controls2, (cx, HEIGHT - 24), C_TEXT_DIM, center=True, shadow=False)
+        controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot"
+        controls2 = "Space to dash • F to toggle auto-fire • ESC to pause"
+        draw_text(self.screen, self.font_small, controls1, (cx, HEIGHT - 34), C_TEXT_DIM, center=True, shadow=False)
+        draw_text(self.screen, self.font_small, controls2, (cx, HEIGHT - 14), C_TEXT_DIM, center=True, shadow=False)
 
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
@@ -4355,6 +4355,7 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
 
 
 
