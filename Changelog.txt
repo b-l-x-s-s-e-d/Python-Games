@@ -91,18 +91,28 @@ Improvements
 
 
 v1.4.2
-Imrpovements
+Improvements
 1. Fully fixed the Challenges and Mastery tab UIs
 2. Added a feature where you need to be at Wave 3 for it to be counted as a "Game Played" for Mastery
 3. Mastery adjustments
 4. Working on adding Story Mode into the game :3
 
-v1.4.3
+v1.5 - Quality of Life Improvements
+New Features
+1. Added 1 more bundle option to the shop
+Improvements
+1. Reduced coins earned from doing challenges
+2. Prevented bundles from being able to sell duplicate weapons
+3. Fix some bundles having extremely low prices compared to their contents
+4. Fix being unable to unequip cosmetics after equipping them
+5. Revamped the Cosmetics tab:
+   i) Remove the "Options" section from the bottom of the Cosmetics tab in the Shop
+   ii) Extend the Cosmetics layout to fit 4 cosmetics per page
+   iii) Separate cosmetics by category (e.g. bullets, outlines) so each has its own page
+   iv) Add a new "Settings" tab to the main menu and move the removed Options there, along with additional settings
+6. I will now be giving names to my updates :D
 Bug Fixes
 1. Fixed piercing upgrades not working on some tanks
-2. Reduced coins earned from doing challenges
-3. Prevented bundles from being able to sell duplicate weapons
-4. Added 1 more bundle option to the shop
 
 
 To-Do Features
@@ -116,6 +126,7 @@ Improvements
 Bug Fixes
 URGENT FIXES!!!
 1.
+
 
 
 
