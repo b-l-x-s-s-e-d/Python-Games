@@ -19,7 +19,7 @@ To run the Tank Game correctly and ensure your progress saves, you **must clone 
    - Files such as `save.json` must remain in the same directory structure.
   
 4. **Run the game**
-   - Open `Tank Game.py`
+   - Open `Tank Game.py`.
    - Any progress you make will automatically update `save.json`.
 
 ## Saving Progress
