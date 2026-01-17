@@ -2,6 +2,7 @@
 
 ---
 
+
 ## Archived Updates
 - v1.1  
 - v1.2  
@@ -10,6 +11,7 @@
 - v1.2.3  
 
 ---
+
 
 ## v1.2.4 — Gameplay Balance Update
 
@@ -26,6 +28,7 @@
 - Coins per wave increased from **2 → 4**
 
 ---
+
 
 ## v1.3 — Weapons and Gameplay Update
 
@@ -44,6 +47,7 @@
 - Tesla fire cooldown reduced from **0.22 → 0.21**
 
 ---
+
 
 ## v1.3.1 — Gameplay Update #2
 
@@ -65,6 +69,7 @@
 
 ---
 
+
 ## v1.3.2 — Tank Balance Update
 
 ### New Features
@@ -78,6 +83,7 @@
 
 ---
 
+
 ## v1.3.3 — Boss Balance Update
 
 ### Gameplay
@@ -86,16 +92,18 @@
 
 ---
 
+
 ## v1.3.4 — Leaderboard & Bug Fixes
 
 ### New Features
-- Added a **Leaderboard** tab to the main menu displaying top 10 runs
+- Added a **Leaderboard** tab to the main menu, displaying the top 10 runs
 
 ### Bug Fixes
 - Fixed piercing not working correctly on the Rocket and Tank
 - Fixed a crash occurring when opening the game
 
 ---
+
 
 ## v1.4 — Progression and Shop Update
 
@@ -107,6 +115,7 @@
 
 ---
 
+
 ## v1.4.1 — UI Stability Update
 
 ### Improvements
@@ -117,6 +126,7 @@
 
 ---
 
+
 ## v1.4.2 — Progression Adjustments
 
 ### Improvements
@@ -126,6 +136,7 @@
 - Story Mode currently in development :3
 
 ---
+
 
 ## v1.5 — Quality of Life Improvements
 
@@ -151,6 +162,7 @@
 
 ---
 
+
 ## v1.5.1 — Game Code Improvements
 
 ### New Features
@@ -162,12 +174,13 @@
 
 ---
 
+
 ## To-Do Features
 
 ### New Features
 - Fullscreen mode
 - Story Mode with level-based progression
-- Kill Streak system rewarding damage-free play
+- Kill Streak system rewards damage-free play
 - Mini Map displayed in the top-right during gameplay
 
 ### Improvements
@@ -177,9 +190,8 @@
 
 ---
 
+
 ## Urgent Fixes
 
 - Remove the cyan overlay in the Leaderboard tab
 - Change 1st, 2nd, and 3rd place numbers to white
-
-
