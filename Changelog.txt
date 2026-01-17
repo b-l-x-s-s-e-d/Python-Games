@@ -8,7 +8,7 @@ v1.2.2
 v1.2.3
 
 
-v1.2.4
+v1.2.4 -- Gameplay Balance Update
 New Features
 1. Working on a BIG update :3
 Gameplay
@@ -20,7 +20,7 @@ Gameplay
 6. Increased coins-per-wave from 2 -> 4
 
 
-v1.3
+v1.3 -- Weapons and Gameplay Update
 New Features
 1. Added Flamethrower Tank
 2. Added Omni Pistol Tank
@@ -35,7 +35,7 @@ Gameplay
 6. Reduced Tesla fire cooldown from 0.22 -> 0.21
 
 
-v1.3.1
+v1.3.1 -- Gameplay Update #2
 New Features
 1. Added Windscreen Wiper as an exclusive, limited, and OP Tank
 Gameplay
@@ -50,7 +50,7 @@ Improvements
 2. Improved Powerup tracker
 
 
-v1.3.2
+v1.3.2 -- Tank Balances Update
 New Features
 1. Added a Tank tank
 2. You can now crit enemies without an upgrade
@@ -60,13 +60,13 @@ Gameplay
 3. Decreased Tank fire cooldown from 1.65 -> 1.5
 
 
-v1.3.3
+v1.3.3 -- Boss Balance Update
 Gameplay
 1. Decreased Boss default damage from 2hp -> 1hp
 2. Decreased Boss bullet speed from 310 -> 270
 
 
-v1.3.4
+v1.3.4 -- Leaderboard Addition and Bug Fixes
 New Features
 1. Added a Leaderboard tab on the main menu, displaying players' top 10 runs
 Bug Fixes
@@ -75,14 +75,14 @@ Bug Fixes
 
 
 v1.4
-New Features
+New Features -- Progression and Shop Update
 1. Added a new Shop tab for Bundles
 2. Expanded Cosmetics with explosion styles, bullet colour, and more
 3. Added Daily and Weekly Challenges
 4. Added a Weapon Mastery tab
 
 
-v1.4.1
+v1.4.1 -- UI Stability Update
 Improvements
 1. Fixed the Mastery tab from crashing upon opening
 2. Added 2 separate tabs for Daily and Weekly Challenges
@@ -90,7 +90,7 @@ Improvements
 4. Rewrote the subtitle in the Mastery tab
 
 
-v1.4.2
+v1.4.2 -- Progression Adjustments
 Improvements
 1. Fully fixed the Challenges and Mastery tab UIs
 2. Added a feature where you need to be at Wave 3 for it to be counted as a "Game Played" for Mastery
@@ -98,7 +98,7 @@ Improvements
 4. Working on adding Story Mode into the game :3
 
 
-v1.5 - Quality of Life Improvements
+v1.5 -- Quality of Life Improvements
 New Features
 1. Added 1 more bundle option to the shop
 2. Story Mode will be added in v1.5.1 or v1.6!!
@@ -117,6 +117,10 @@ Improvements
 Bug Fixes
 1. Fixed piercing upgrades not working on some tanks
 
+v1.5.1 -- 
+New Features
+1. Update names added to all versions
+
 
 To-Do Features
 New Features
@@ -133,6 +137,7 @@ Bug Fixes
 
 URGENT FIXES!!!
 1. Remove the cyan overlay in the leaderboard tab and change the 1., 2., 3., numbers to white
+
 
 
 
