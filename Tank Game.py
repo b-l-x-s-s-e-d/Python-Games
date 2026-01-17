@@ -1721,6 +1721,7 @@ class Game:
         # UI
         self.menu_buttons: List[Button] = []
         self.menu_challenges_btn: Optional[Button] = None
+        self.menu_quit_btn: Optional[Button] = None
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
@@ -1813,13 +1814,9 @@ class Game:
     # ---------------- UI build ----------------
     def _build_menus(self):
         cx = WIDTH // 2
-        bw, bh = 340, 56
-        gap_x = 30
+        bw, bh = 360, 56
         gap_y = 18
-        grid_cols = 2
-        grid_w = bw * grid_cols + gap_x
-        grid_x = cx - grid_w // 2
-        grid_y = 242
+        stack_y = 260
 
         menu_actions = [
             ("Start Run", self.start_run),
@@ -1827,20 +1824,20 @@ class Game:
             ("Shop", self.open_shop),
             ("Settings", self.open_settings),
             ("Leaderboard", self.open_leaderboard),
-            ("Challenges", self.open_challenges),
-            ("Controls", lambda: self.set_state("controls")),
-            ("Quit", self.quit_game),
         ]
 
         self.menu_buttons = []
         for idx, (label, callback) in enumerate(menu_actions):
-            row = idx // grid_cols
-            col = idx % grid_cols
-            x = grid_x + col * (bw + gap_x)
-            y = grid_y + row * (bh + gap_y)
+            x = cx - bw // 2
+            y = stack_y + idx * (bh + gap_y)
             self.menu_buttons.append(Button(pygame.Rect(x, y, bw, bh), label, callback))
 
-        self.menu_challenges_btn = None
+        self.menu_quit_btn = Button(pygame.Rect(WIDTH - 80, 30, 50, 44), "X", self.quit_game)
+        self.menu_challenges_btn = Button(
+            pygame.Rect(WIDTH - 300, 30, 200, 44),
+            "Challenges",
+            self.open_challenges,
+        )
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
@@ -3521,6 +3518,14 @@ class Game:
         for b in self.menu_buttons:
             b.update(1 / 60, mouse_pos, mouse_down, events)
             b.draw(self.screen, self.font_small)
+
+        if self.menu_challenges_btn:
+            self.menu_challenges_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.menu_challenges_btn.draw(self.screen, self.font_small)
+
+        if self.menu_quit_btn:
+            self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.menu_quit_btn.draw(self.screen, self.font_small)
 
 
         controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot"
