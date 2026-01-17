@@ -1674,7 +1674,7 @@ class Game:
         self._init_audio()
 
         # State
-        self.state = "menu"  # menu, more, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
+        self.state = "menu"  # menu, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
         self.running = True
 
         # Camera
@@ -1726,9 +1726,6 @@ class Game:
         self.leaderboard_back_btn: Optional[Button] = None
         self.settings_back_btn: Optional[Button] = None
         self.challenges_back_btn: Optional[Button] = None
-        self.more_buttons: List[Button] = []
-        self.more_back_btn: Optional[Button] = None
-        self.more_tiles: List[pygame.Rect] = []
         self.challenges_view = "daily"
         self.challenge_tabs: List[TabButton] = []
         self.pause_buttons: List[Button] = []
@@ -1817,55 +1814,33 @@ class Game:
     def _build_menus(self):
         cx = WIDTH // 2
         bw, bh = 340, 56
-        top = 278
-        gap = 68
-        main_btn_size = 120
-        main_btn_y = 330
+        gap_x = 30
+        gap_y = 18
+        grid_cols = 2
+        grid_w = bw * grid_cols + gap_x
+        grid_x = cx - grid_w // 2
+        grid_y = 242
 
-        self.menu_buttons = [
-            Button(pygame.Rect(cx - main_btn_size // 2, main_btn_y, main_btn_size, main_btn_size), "Start\nRun", self.start_run),
-            Button(pygame.Rect(cx - main_btn_size - 26, main_btn_y, main_btn_size, main_btn_size), "Weapons", self.open_weapons_screen),
-            Button(pygame.Rect(cx + 26, main_btn_y, main_btn_size, main_btn_size), "More", lambda: self.set_state("more")),
-        ]
-        self.menu_quit_btn = Button(
-            pygame.Rect(20, 18, 54, 48),
-            "X",
-            self.quit_game
-        )
-        self.menu_challenges_btn = None
-
-        self.more_buttons = []
-        self.more_tiles = []
-        more_cols = 6
-        more_rows = 5
-        tile_gap = 12
-        tile_size = 80
-        grid_w = more_cols * tile_size + (more_cols - 1) * tile_gap
-        grid_h = more_rows * tile_size + (more_rows - 1) * tile_gap
-        grid_x = (WIDTH - grid_w) // 2
-        grid_y = 200
-
-        more_actions = [
+        menu_actions = [
+            ("Start Run", self.start_run),
+            ("Weapons", self.open_weapons_screen),
             ("Shop", self.open_shop),
             ("Settings", self.open_settings),
             ("Leaderboard", self.open_leaderboard),
-            ("Challenges", lambda: self.set_state("challenges")),
+            ("Challenges", self.open_challenges),
             ("Controls", lambda: self.set_state("controls")),
-            ("Back", lambda: self.set_state("menu")),
+            ("Quit", self.quit_game),
         ]
 
-        action_idx = 0
-        for row in range(more_rows):
-            for col in range(more_cols):
-                x = grid_x + col * (tile_size + tile_gap)
-                y = grid_y + row * (tile_size + tile_gap)
-                rect = pygame.Rect(x, y, tile_size, tile_size)
-                if action_idx < len(more_actions):
-                    label, callback = more_actions[action_idx]
-                    self.more_buttons.append(Button(rect, label, callback))
-                else:
-                    self.more_tiles.append(rect)
-                action_idx += 1
+        self.menu_buttons = []
+        for idx, (label, callback) in enumerate(menu_actions):
+            row = idx // grid_cols
+            col = idx % grid_cols
+            x = grid_x + col * (bw + gap_x)
+            y = grid_y + row * (bh + gap_y)
+            self.menu_buttons.append(Button(pygame.Rect(x, y, bw, bh), label, callback))
+
+        self.menu_challenges_btn = None
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
@@ -2826,7 +2801,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges", "more"):
+                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -3547,10 +3522,6 @@ class Game:
             b.update(1 / 60, mouse_pos, mouse_down, events)
             b.draw(self.screen, self.font_small)
 
-        # Top-left X quit button
-        self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
-        self.menu_quit_btn.draw(self.screen, self.font_med)
-
 
         controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot"
         controls2 = "Space to dash • F to toggle auto-fire • ESC to pause"
@@ -3559,26 +3530,6 @@ class Game:
 
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
-
-    def draw_more(self, events):
-        self.screen.fill(C_BG)
-        cx = WIDTH // 2
-
-        draw_text(self.screen, self.font_big, "MORE", (cx, 92), C_TEXT, center=True)
-        draw_text(self.screen, self.font_ui, "More places to explore", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
-        pygame.draw.line(self.screen, C_ACCENT, (cx - 300, 148), (cx + 300, 148), 2)
-        pygame.draw.line(self.screen, C_ACCENT_2, (cx - 250, 154), (cx + 250, 154), 2)
-
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
-
-        for rect in self.more_tiles:
-            pygame.draw.rect(self.screen, (*C_PANEL_2, 220), rect, border_radius=8)
-            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), rect, 2, border_radius=8)
-
-        for b in self.more_buttons:
-            b.update(1 / 60, mouse_pos, mouse_down, events)
-            b.draw(self.screen, self.font_tiny)
 
     def draw_settings(self, events):
         self.screen.fill(C_BG)
@@ -4382,9 +4333,6 @@ class Game:
 
             elif self.state == "menu":
                 self.draw_menu(events)
-
-            elif self.state == "more":
-                self.draw_more(events)
 
             elif self.state == "weapons":
                 self.draw_weapons(events)
