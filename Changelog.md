@@ -13,7 +13,7 @@
 ---
 
 
-## v1.2.4 — Gameplay Balance Update
+## v1.2.4 -- Gameplay Balance Update
 
 ### New Features
 - Working on a BIG update :3
@@ -30,7 +30,7 @@
 ---
 
 
-## v1.3 — Weapons and Gameplay Update
+## v1.3 -- Weapons and Gameplay Update
 
 ### New Features
 - Added **Flamethrower Tank**
@@ -49,7 +49,7 @@
 ---
 
 
-## v1.3.1 — Gameplay Update #2
+## v1.3.1 -- Gameplay Update #2
 
 ### New Features
 - Added **Windscreen Wiper**, an exclusive, limited, and overpowered tank
@@ -70,7 +70,7 @@
 ---
 
 
-## v1.3.2 — Tank Balance Update
+## v1.3.2 -- Tank Balance Update
 
 ### New Features
 - Added the **Tank Tank**
@@ -84,7 +84,7 @@
 ---
 
 
-## v1.3.3 — Boss Balance Update
+## v1.3.3 -- Boss Balance Update
 
 ### Gameplay
 - Boss default damage reduced from **2 HP → 1 HP**
@@ -93,7 +93,7 @@
 ---
 
 
-## v1.3.4 — Leaderboard & Bug Fixes
+## v1.3.4 -- Leaderboard & Bug Fixes
 
 ### New Features
 - Added a **Leaderboard** tab to the main menu, displaying the top 10 runs
@@ -105,7 +105,7 @@
 ---
 
 
-## v1.4 — Progression and Shop Update
+## v1.4 -- Progression and Shop Update
 
 ### New Features
 - Added a **Bundles** tab to the Shop
@@ -116,7 +116,7 @@
 ---
 
 
-## v1.4.1 — UI Stability Update
+## v1.4.1 -- UI Stability Update
 
 ### Improvements
 - Fixed Mastery tab crashing on open
@@ -127,7 +127,7 @@
 ---
 
 
-## v1.4.2 — Progression Adjustments
+## v1.4.2 -- Progression Adjustments
 
 ### Improvements
 - Fully fixed Challenges and Mastery UIs
@@ -138,7 +138,7 @@
 ---
 
 
-## v1.5 — Quality of Life Improvements
+## v1.5 -- Quality of Life Improvements
 
 ### New Features
 - Added one additional bundle to the Shop
@@ -163,7 +163,7 @@
 ---
 
 
-## v1.5.1 — Game Code Improvements
+## v1.5.1 -- Game Code Improvements
 
 ### New Features
 - Added update names to all versions
@@ -195,3 +195,4 @@
 
 - Remove the cyan overlay in the Leaderboard tab
 - Change 1st, 2nd, and 3rd place numbers to white
+
