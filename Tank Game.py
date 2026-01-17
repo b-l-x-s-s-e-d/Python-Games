@@ -1654,7 +1654,7 @@ class Game:
         self._init_audio()
 
         # State
-        self.state = "menu"  # menu, weapons, shop, controls, leaderboard, challenges, playing, paused, levelup, gameover
+        self.state = "menu"  # menu, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
         self.running = True
 
         # Camera
@@ -1704,6 +1704,7 @@ class Game:
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
+        self.settings_back_btn: Optional[Button] = None
         self.challenges_back_btn: Optional[Button] = None
         self.challenges_view = "daily"
         self.challenge_tabs: List[TabButton] = []
@@ -1711,7 +1712,7 @@ class Game:
         self.gameover_buttons: List[Button] = []
 
         # Shop tabs/pages
-        self.shop_tab = "meta"      # meta / weapons / cosmetics / bundles / settings
+        self.shop_tab = "meta"      # meta / weapons / cosmetics / bundles
         self.shop_page = 0
         self.shop_tabs: List[TabButton] = []
         self.shop_next_btn: Optional[Button] = None
@@ -1800,7 +1801,8 @@ class Game:
             Button(pygame.Rect(cx - bw // 2, top + gap * 0, bw, bh), "Start Run", self.start_run),
             Button(pygame.Rect(cx - bw // 2, top + gap * 1, bw, bh), "Weapons", self.open_weapons_screen),
             Button(pygame.Rect(cx - bw // 2, top + gap * 2, bw, bh), "Shop", self.open_shop),
-            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Leaderboard", self.open_leaderboard),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Settings", self.open_settings),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 4, bw, bh), "Leaderboard", self.open_leaderboard),
         ]
         self.menu_quit_btn = Button(
             pygame.Rect(20, 18, 54, 48),
@@ -1816,6 +1818,7 @@ class Game:
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.settings_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
 
         # Weapons pagination buttons (bottom-right)
@@ -1839,7 +1842,7 @@ class Game:
         tab_w = 170
         tab_h = 44
         tab_gap = 12
-        start_x = (WIDTH - (tab_w * 5 + tab_gap * 4)) // 2
+        start_x = (WIDTH - (tab_w * 4 + tab_gap * 3)) // 2
 
         def set_tab(tid: str):
             self.shop_tab = tid
@@ -1852,7 +1855,6 @@ class Game:
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 1, tab_y, tab_w, tab_h), "WEAPONS", set_tab, "weapons"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 2, tab_y, tab_w, tab_h), "COSMETICS", set_tab, "cosmetics"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 3, tab_y, tab_w, tab_h), "BUNDLES", set_tab, "bundles"),
-            TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 4, tab_y, tab_w, tab_h), "SETTINGS", set_tab, "settings"),
         ]
 
         self.shop_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_shop_page(-1))
@@ -1933,6 +1935,9 @@ class Game:
         if self.save.ensure_cosmetics(COSMETICS):
             self.save.save()
         self.set_state("shop")
+
+    def open_settings(self):
+        self.set_state("settings")
 
     def open_leaderboard(self):
         self.set_state("leaderboard")
@@ -2769,7 +2774,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop", "leaderboard", "challenges"):
+                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -3507,6 +3512,62 @@ class Game:
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
 
+    def draw_settings(self, events):
+        self.screen.fill(C_BG)
+        cx = WIDTH // 2
+
+        draw_text(self.screen, self.font_big, "SETTINGS", (cx, 92), C_TEXT, center=True)
+        draw_text(self.screen, self.font_ui, "Customize your run feel", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
+
+        box = pygame.Rect(140, 175, WIDTH - 280, HEIGHT - 275)
+        pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
+
+        opt_w = 220
+        opt_h = 46
+        opt_y = box.y + 26
+        opt_gap = 16
+        opt_x = box.x + 16
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+
+        def draw_option(label, value_on, on_click, x):
+            rect = pygame.Rect(x, opt_y, opt_w, opt_h)
+            pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=12)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), rect, 2, border_radius=12)
+            draw_text(self.screen, self.font_shop_small, label, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
+            badge = pygame.Rect(rect.right - 60, rect.y + 8, 48, 28)
+            pygame.draw.rect(self.screen, (*C_OK, 220) if value_on else (*C_TEXT_DIM, 160), badge, border_radius=8)
+            pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=8)
+            rect_centered_text(self.screen, self.font_tiny, "ON" if value_on else "OFF", badge,
+                               (10, 20, 20) if value_on else (25, 25, 32), shadow=False)
+            if rect.collidepoint(mouse_pos) and mouse_down:
+                on_click()
+
+        draw_option("Screen Shake", bool(self.save.settings.get("shake", True)), lambda: self.toggle_setting("shake"), opt_x)
+        draw_option("Audio", bool(self.save.settings.get("audio", True)), lambda: self.toggle_setting("audio"), opt_x + opt_w + opt_gap)
+
+        reset_y = opt_y + opt_h + 50
+        draw_text(self.screen, self.font_shop_item, "RESET", (box.x + 16, reset_y), C_TEXT, shadow=False)
+
+        reset_btn_y = reset_y + 34
+        reset_w = 240
+        reset_h = 46
+        reset_gap = 16
+        reset_x = box.x + 16
+
+        reset_settings_btn = Button(pygame.Rect(reset_x, reset_btn_y, reset_w, reset_h), "Defaults", self.reset_settings)
+        reset_cosmetics_btn = Button(pygame.Rect(reset_x + reset_w + reset_gap, reset_btn_y, reset_w, reset_h), "Reset Cosmetics", self.reset_cosmetics)
+
+        for btn in (reset_settings_btn, reset_cosmetics_btn):
+            btn.update(1 / 60, mouse_pos, mouse_down, events)
+            btn.draw(self.screen, self.font_shop_small)
+
+        if self.settings_back_btn:
+            self.settings_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.settings_back_btn.draw(self.screen, self.font_med)
+
     def draw_controls(self):
         self.screen.fill(C_BG)
         draw_text(self.screen, self.font_big, "CONTROLS", (WIDTH // 2, 100), C_TEXT, center=True)
@@ -3530,30 +3591,53 @@ class Game:
         draw_text(self.screen, self.font_big, "LEADERBOARD", (cx, 92), C_TEXT, center=True)
         draw_text(self.screen, self.font_ui, "Top runs by score", (cx, 128), C_TEXT_DIM, center=True, shadow=False)
 
-        box = pygame.Rect(120, 170, WIDTH - 240, HEIGHT - 280)
+        box = pygame.Rect(140, 170, WIDTH - 280, HEIGHT - 280)
         pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
-        header_y = box.y + 18
-        draw_text(self.screen, self.font_ui, "#", (box.x + 30, header_y), C_TEXT_DIM, shadow=False)
-        draw_text(self.screen, self.font_ui, "Score", (box.x + 90, header_y), C_TEXT_DIM, shadow=False)
-        draw_text(self.screen, self.font_ui, "Time", (box.x + 300, header_y), C_TEXT_DIM, shadow=False)
-        draw_text(self.screen, self.font_ui, "Wave", (box.x + 470, header_y), C_TEXT_DIM, shadow=False)
-        draw_text(self.screen, self.font_ui, "Level", (box.x + 600, header_y), C_TEXT_DIM, shadow=False)
+        header = pygame.Rect(box.x + 10, box.y + 12, box.w - 20, 44)
+        pygame.draw.rect(self.screen, (*C_PANEL_2, 240), header, border_radius=12)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), header, 2, border_radius=12)
+
+        col_rank = header.x + 16
+        col_score = header.x + 110
+        col_time = header.x + 300
+        col_wave = header.x + 470
+        col_level = header.right - 110
+
+        header_y = header.y + 12
+        draw_text(self.screen, self.font_ui, "RANK", (col_rank, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "SCORE", (col_score, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "TIME", (col_time, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "WAVE", (col_wave, header_y), C_TEXT_DIM, shadow=False)
+        draw_text(self.screen, self.font_ui, "LEVEL", (col_level, header_y), C_TEXT_DIM, shadow=False)
 
         entries = list(self.save.leaderboard)
         if not entries:
             draw_text(self.screen, self.font_med, "No runs yet — play a game to set a score!", (cx, box.centery), C_TEXT_DIM, center=True, shadow=False)
         else:
-            row_y = header_y + 36
-            row_gap = 34
+            row_y = header.bottom + 12
+            row_gap = 10
+            row_h = 40
             for idx, entry in enumerate(entries, start=1):
-                draw_text(self.screen, self.font_ui, f"{idx}.", (box.x + 30, row_y), C_TEXT, shadow=False)
-                draw_text(self.screen, self.font_ui, f"{entry['score']}", (box.x + 90, row_y), C_TEXT, shadow=False)
-                draw_text(self.screen, self.font_ui, f"{entry['time']}s", (box.x + 300, row_y), C_TEXT, shadow=False)
-                draw_text(self.screen, self.font_ui, f"{entry['wave']}", (box.x + 470, row_y), C_TEXT, shadow=False)
-                draw_text(self.screen, self.font_ui, f"{entry['level']}", (box.x + 600, row_y), C_TEXT, shadow=False)
-                row_y += row_gap
+                row = pygame.Rect(box.x + 10, row_y, box.w - 20, row_h)
+                row_color = (*C_PANEL_2, 220) if idx % 2 == 0 else (*C_PANEL_2, 180)
+                if idx == 1:
+                    row_color = (*C_ACCENT, 60)
+                pygame.draw.rect(self.screen, row_color, row, border_radius=10)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 150), row, 1, border_radius=10)
+
+                badge = pygame.Rect(row.x + 8, row.y + 8, 48, row_h - 16)
+                badge_color = (*C_ACCENT, 220) if idx == 1 else (*C_PANEL, 220)
+                pygame.draw.rect(self.screen, badge_color, badge, border_radius=8)
+                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 190), badge, 2, border_radius=8)
+                rect_centered_text(self.screen, self.font_small, f"{idx}", badge, (10, 20, 20), shadow=False)
+
+                draw_text(self.screen, self.font_ui, f"{entry['score']}", (col_score, row.y + 12), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['time']}s", (col_time, row.y + 12), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['wave']}", (col_wave, row.y + 12), C_TEXT, shadow=False)
+                draw_text(self.screen, self.font_ui, f"{entry['level']}", (col_level, row.y + 12), C_TEXT, shadow=False)
+                row_y += row_h + row_gap
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
@@ -3950,11 +4034,7 @@ class Game:
                 draw_text(self.screen, self.font_shop_small, cost_txt, (row.right - 310, row.y + 38), C_COIN, shadow=False)
 
                 action_rect = pygame.Rect(row.right - 120, row.y + 16, 100, 38)
-                if equipped and cosmetic.id != DEFAULT_COSMETICS.get(cosmetic.category):
-                    btn = Button(action_rect, "Unequip", callback=lambda c=cosmetic.category: self.unequip_cosmetic(c))
-                    btn.update(1 / 60, mouse_pos, mouse_down, events)
-                    btn.draw(self.screen, self.font_shop_small)
-                elif equipped:
+                if equipped:
                     pygame.draw.rect(self.screen, (*C_OK, 220), action_rect, border_radius=10)
                     pygame.draw.rect(self.screen, C_WALL_EDGE, action_rect, 2, border_radius=10)
                     rect_centered_text(self.screen, self.font_shop_small, "EQUIPPED", action_rect, (10, 20, 20), shadow=False)
@@ -3977,51 +4057,6 @@ class Game:
             mid_x = (self.shop_prev_btn.rect.centerx + self.shop_next_btn.rect.centerx) // 2
             below_y = self.shop_prev_btn.rect.bottom + 10
             draw_text(self.screen, self.font_tiny, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
-            return
-
-        if self.shop_tab == "settings":
-            draw_text(self.screen, self.font_shop_item, "OPTIONS", (box.x + 16, box.y + 16), C_TEXT, shadow=False)
-
-            opt_w = 220
-            opt_h = 46
-            opt_y = box.y + 52
-            opt_gap = 16
-            opt_x = box.x + 16
-
-            def draw_option(label, value_on, on_click, x):
-                rect = pygame.Rect(x, opt_y, opt_w, opt_h)
-                pygame.draw.rect(self.screen, (*C_PANEL_2, 245), rect, border_radius=12)
-                pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), rect, 2, border_radius=12)
-                draw_text(self.screen, self.font_shop_small, label, (rect.x + 14, rect.y + 12), C_TEXT, shadow=False)
-                badge = pygame.Rect(rect.right - 60, rect.y + 8, 48, 28)
-                pygame.draw.rect(self.screen, (*C_OK, 220) if value_on else (*C_TEXT_DIM, 160), badge, border_radius=8)
-                pygame.draw.rect(self.screen, C_WALL_EDGE, badge, 2, border_radius=8)
-                rect_centered_text(self.screen, self.font_tiny, "ON" if value_on else "OFF", badge,
-                                   (10, 20, 20) if value_on else (25, 25, 32), shadow=False)
-                if rect.collidepoint(mouse_pos) and mouse_down:
-                    on_click()
-
-            draw_option("Screen Shake", bool(self.save.settings.get("shake", True)), lambda: self.toggle_setting("shake"), opt_x)
-            draw_option("Audio", bool(self.save.settings.get("audio", True)), lambda: self.toggle_setting("audio"), opt_x + opt_w + opt_gap)
-
-            reset_y = opt_y + opt_h + 40
-            draw_text(self.screen, self.font_shop_item, "RESET", (box.x + 16, reset_y), C_TEXT, shadow=False)
-
-            reset_btn_y = reset_y + 34
-            reset_w = 240
-            reset_h = 46
-            reset_gap = 16
-            reset_x = box.x + 16
-
-            reset_settings_btn = Button(pygame.Rect(reset_x, reset_btn_y, reset_w, reset_h), "Defaults", self.reset_settings)
-            reset_cosmetics_btn = Button(pygame.Rect(reset_x + reset_w + reset_gap, reset_btn_y, reset_w, reset_h), "Reset Cosmetics", self.reset_cosmetics)
-
-            for btn in (reset_settings_btn, reset_cosmetics_btn):
-                btn.update(1 / 60, mouse_pos, mouse_down, events)
-                btn.draw(self.screen, self.font_shop_small)
-
-            self.shop_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.shop_back_btn.draw(self.screen, self.font_med)
             return
 
         if self.shop_tab == "bundles":
@@ -4285,6 +4320,9 @@ class Game:
 
             elif self.state == "shop":
                 self.draw_shop(events)
+
+            elif self.state == "settings":
+                self.draw_settings(events)
 
             elif self.state == "controls":
                 self.draw_controls()
