@@ -339,16 +339,10 @@ class SaveManager:
 
     def ensure_cosmetics(self, cosmetics: List["CosmeticDef"]) -> bool:
         changed = False
-        default_equipped = {
-            "outline": "outline_standard",
-            "bullet": "bullet_standard",
-            "trail": "trail_none",
-            "explosion": "explosion_ember",
-        }
         if not self.cosmetics_equipped:
-            self.cosmetics_equipped = dict(default_equipped)
+            self.cosmetics_equipped = dict(DEFAULT_COSMETICS)
             changed = True
-        for category, cid in default_equipped.items():
+        for category, cid in DEFAULT_COSMETICS.items():
             if category not in self.cosmetics_equipped:
                 self.cosmetics_equipped[category] = cid
                 changed = True
@@ -358,7 +352,7 @@ class SaveManager:
                 self.cosmetics_unlocked[cosmetic.id] = bool(cosmetic.default)
                 changed = True
 
-        for category, default_id in default_equipped.items():
+        for category, default_id in DEFAULT_COSMETICS.items():
             equipped_id = self.cosmetics_equipped.get(category, default_id)
             if equipped_id not in self.cosmetics_unlocked:
                 self.cosmetics_equipped[category] = default_id
@@ -1291,6 +1285,15 @@ class CosmeticDef:
     bundle_only: bool = False
 
 
+DEFAULT_COSMETICS = {
+    "outline": "outline_standard",
+    "bullet": "bullet_standard",
+    "trail": "trail_none",
+    "explosion": "explosion_ember",
+}
+
+BUNDLE_ONLY_COSMETIC_VALUE = 150
+
 COSMETICS = [
     CosmeticDef("outline_standard", "Standard Outline", "Clean default trim.", "outline", 0, C_ACCENT, default=True),
     CosmeticDef("outline_neon", "Neon Outline", "Bright cyan glow.", "outline", 120, C_OUTLINE_NEON),
@@ -1708,11 +1711,13 @@ class Game:
         self.gameover_buttons: List[Button] = []
 
         # Shop tabs/pages
-        self.shop_tab = "meta"      # meta / weapons / cosmetics / bundles
+        self.shop_tab = "meta"      # meta / weapons / cosmetics / bundles / settings
         self.shop_page = 0
         self.shop_tabs: List[TabButton] = []
         self.shop_next_btn: Optional[Button] = None
         self.shop_prev_btn: Optional[Button] = None
+        self.cosmetics_category = "outline"
+        self.cosmetic_tabs: List[TabButton] = []
 
         # Weapons screen pagination
         self.weapon_page = 0
@@ -1831,24 +1836,45 @@ class Game:
 
         # Shop tabs
         tab_y = 120
-        tab_w = 180
+        tab_w = 170
         tab_h = 44
-        tab_gap = 14
-        start_x = (WIDTH - (tab_w * 4 + tab_gap * 3)) // 2
+        tab_gap = 12
+        start_x = (WIDTH - (tab_w * 5 + tab_gap * 4)) // 2
 
         def set_tab(tid: str):
             self.shop_tab = tid
             self.shop_page = 0
+            if tid == "cosmetics":
+                self.cosmetics_category = "outline"
 
         self.shop_tabs = [
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 0, tab_y, tab_w, tab_h), "META", set_tab, "meta"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 1, tab_y, tab_w, tab_h), "WEAPONS", set_tab, "weapons"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 2, tab_y, tab_w, tab_h), "COSMETICS", set_tab, "cosmetics"),
             TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 3, tab_y, tab_w, tab_h), "BUNDLES", set_tab, "bundles"),
+            TabButton(pygame.Rect(start_x + (tab_w + tab_gap) * 4, tab_y, tab_w, tab_h), "SETTINGS", set_tab, "settings"),
         ]
 
         self.shop_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_shop_page(-1))
         self.shop_next_btn = Button(pygame.Rect(WIDTH - 170, HEIGHT - 80, 120, 52), "Next", lambda: self.change_shop_page(+1))
+
+        # Cosmetics tabs
+        ctab_y = 170
+        ctab_w = 160
+        ctab_h = 36
+        ctab_gap = 12
+        ctab_start_x = (WIDTH - (ctab_w * 4 + ctab_gap * 3)) // 2
+
+        def set_cosmetic_category(category: str):
+            self.cosmetics_category = category
+            self.shop_page = 0
+
+        self.cosmetic_tabs = [
+            TabButton(pygame.Rect(ctab_start_x + (ctab_w + ctab_gap) * 0, ctab_y, ctab_w, ctab_h), "OUTLINE", set_cosmetic_category, "outline"),
+            TabButton(pygame.Rect(ctab_start_x + (ctab_w + ctab_gap) * 1, ctab_y, ctab_w, ctab_h), "BULLETS", set_cosmetic_category, "bullet"),
+            TabButton(pygame.Rect(ctab_start_x + (ctab_w + ctab_gap) * 2, ctab_y, ctab_w, ctab_h), "TRAILS", set_cosmetic_category, "trail"),
+            TabButton(pygame.Rect(ctab_start_x + (ctab_w + ctab_gap) * 3, ctab_y, ctab_w, ctab_h), "EXPLOSION", set_cosmetic_category, "explosion"),
+        ]
 
         # Weapons tabs
         wtab_y = 108
@@ -1924,13 +1950,8 @@ class Game:
         cosmetic = self.get_cosmetic(cosmetic_id) if cosmetic_id else None
         if cosmetic:
             return cosmetic
-        fallback = {
-            "outline": COSMETICS_BY_ID["outline_standard"],
-            "bullet": COSMETICS_BY_ID["bullet_standard"],
-            "trail": COSMETICS_BY_ID["trail_none"],
-            "explosion": COSMETICS_BY_ID["explosion_ember"],
-        }
-        return fallback[category]
+        fallback_id = DEFAULT_COSMETICS[category]
+        return COSMETICS_BY_ID[fallback_id]
 
     def get_outline_color(self) -> Tuple[int, int, int]:
         return self.get_equipped_cosmetic("outline").color
@@ -1964,6 +1985,15 @@ class Game:
         self.save.save()
         self.audio_play("buy")
 
+    def unequip_cosmetic(self, category: str):
+        default_id = DEFAULT_COSMETICS.get(category)
+        if not default_id:
+            return
+        self.save.cosmetics_equipped[category] = default_id
+        self.save.cosmetics_unlocked[default_id] = True
+        self.save.save()
+        self.audio_play("buy")
+
     # ---------------- Bundles ----------------
     def resolve_bundle_items(self, bundle: BundleDef) -> Tuple[List[str], List[str], List[str]]:
         available_weapons = [
@@ -1983,6 +2013,13 @@ class Game:
                 resolved_weapons.append(replacement)
         return resolved_weapons, list(bundle.meta), list(bundle.cosmetics)
 
+    def cosmetic_bundle_value(self, cosmetic: CosmeticDef) -> int:
+        if cosmetic.cost > 0:
+            return cosmetic.cost
+        if cosmetic.bundle_only:
+            return BUNDLE_ONLY_COSMETIC_VALUE
+        return 0
+
     def bundle_base_value(self, bundle: BundleDef) -> int:
         total = 0
         weapons, meta, cosmetics = self.resolve_bundle_items(bundle)
@@ -1997,7 +2034,7 @@ class Game:
         for cid in cosmetics:
             cosmetic = COSMETICS_BY_ID.get(cid)
             if cosmetic:
-                total += cosmetic.cost
+                total += self.cosmetic_bundle_value(cosmetic)
         return total
 
     def bundle_owned_value(self, bundle: BundleDef) -> int:
@@ -2017,7 +2054,7 @@ class Game:
             if self.save.cosmetics_unlocked.get(cid, False):
                 cosmetic = COSMETICS_BY_ID.get(cid)
                 if cosmetic:
-                    owned += cosmetic.cost
+                    owned += self.cosmetic_bundle_value(cosmetic)
         return owned
 
     def bundle_price(self, bundle: BundleDef) -> int:
@@ -2252,6 +2289,20 @@ class Game:
         self.save.save()
         if key == "audio":
             self.audio_enabled = bool(self.save.settings.get("audio", True))
+        self.audio_play("buy")
+
+    def reset_settings(self):
+        self.save.settings["audio"] = True
+        self.save.settings["shake"] = True
+        self.audio_enabled = AUDIO_ENABLED_DEFAULT and bool(self.save.settings.get("audio", True))
+        self.save.save()
+        self.audio_play("buy")
+
+    def reset_cosmetics(self):
+        self.save.cosmetics_equipped = dict(DEFAULT_COSMETICS)
+        for cid in DEFAULT_COSMETICS.values():
+            self.save.cosmetics_unlocked[cid] = True
+        self.save.save()
         self.audio_play("buy")
 
     # ---------------- Weapons screen ----------------
@@ -3847,17 +3898,20 @@ class Game:
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
 
         if self.shop_tab == "cosmetics":
+            for tab in self.cosmetic_tabs:
+                tab.update(mouse_pos, mouse_down)
+                tab.draw(self.screen, self.font_shop_desc, active=(tab.tab_id == self.cosmetics_category))
+
             controls_top = min(self.shop_prev_btn.rect.top, self.shop_back_btn.rect.top)
-            options_box_h = 86
-            options_box_y = controls_top - options_box_h - 14
-            list_bottom = options_box_y - 12
-            cosmetic_box = pygame.Rect(70, 175, WIDTH - 140, list_bottom - 175)
+            list_top = 220
+            list_bottom = controls_top - 12
+            cosmetic_box = pygame.Rect(70, list_top, WIDTH - 140, list_bottom - list_top)
             pygame.draw.rect(self.screen, (*C_PANEL, 235), cosmetic_box, border_radius=16)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), cosmetic_box, 2, border_radius=16)
 
-            cosmetics = COSMETICS
-            rows_per_page = self._shop_rows_per_page(cosmetic_box)
-            total_pages = max(1, math.ceil(len(cosmetics) / max(1, rows_per_page)))
+            cosmetics = [c for c in COSMETICS if c.category == self.cosmetics_category]
+            rows_per_page = 4
+            total_pages = max(1, math.ceil(len(cosmetics) / rows_per_page))
             self.shop_page = clamp(self.shop_page, 0, total_pages - 1)
 
             start = self.shop_page * rows_per_page
@@ -3886,7 +3940,7 @@ class Game:
                 unlocked = bool(self.save.cosmetics_unlocked.get(cosmetic.id, False))
                 equipped = self.save.cosmetics_equipped.get(cosmetic.category) == cosmetic.id
                 status = "Owned" if unlocked else ("Bundle Exclusive" if cosmetic.bundle_only else "Locked")
-                cost_txt = "--" if unlocked else f"{cosmetic.cost} coins"
+                cost_txt = "--" if unlocked or cosmetic.bundle_only else f"{cosmetic.cost} coins"
                 cat_txt = cosmetic.category.upper()
 
                 draw_text(self.screen, self.font_shop_item, f"{cosmetic.name}  •  {cat_txt}", (row.x + 14, row.y + 10), C_TEXT, shadow=False)
@@ -3896,7 +3950,11 @@ class Game:
                 draw_text(self.screen, self.font_shop_small, cost_txt, (row.right - 310, row.y + 38), C_COIN, shadow=False)
 
                 action_rect = pygame.Rect(row.right - 120, row.y + 16, 100, 38)
-                if equipped:
+                if equipped and cosmetic.id != DEFAULT_COSMETICS.get(cosmetic.category):
+                    btn = Button(action_rect, "Unequip", callback=lambda c=cosmetic.category: self.unequip_cosmetic(c))
+                    btn.update(1 / 60, mouse_pos, mouse_down, events)
+                    btn.draw(self.screen, self.font_shop_small)
+                elif equipped:
                     pygame.draw.rect(self.screen, (*C_OK, 220), action_rect, border_radius=10)
                     pygame.draw.rect(self.screen, C_WALL_EDGE, action_rect, 2, border_radius=10)
                     rect_centered_text(self.screen, self.font_shop_small, "EQUIPPED", action_rect, (10, 20, 20), shadow=False)
@@ -3907,16 +3965,28 @@ class Game:
                     btn.update(1 / 60, mouse_pos, mouse_down, events)
                     btn.draw(self.screen, self.font_shop_small)
 
-            options_box = pygame.Rect(70, options_box_y, WIDTH - 140, options_box_h)
-            pygame.draw.rect(self.screen, (*C_PANEL, 235), options_box, border_radius=14)
-            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), options_box, 2, border_radius=14)
-            draw_text(self.screen, self.font_shop_small, "OPTIONS", (options_box.x + 14, options_box.y + 10), C_TEXT_DIM, shadow=False)
+            self.shop_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_back_btn.draw(self.screen, self.font_med)
+
+            self.shop_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.shop_prev_btn.draw(self.screen, self.font_med)
+            self.shop_next_btn.draw(self.screen, self.font_med)
+
+            page_txt = f"Page {self.shop_page + 1}/{total_pages}"
+            mid_x = (self.shop_prev_btn.rect.centerx + self.shop_next_btn.rect.centerx) // 2
+            below_y = self.shop_prev_btn.rect.bottom + 10
+            draw_text(self.screen, self.font_tiny, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
+            return
+
+        if self.shop_tab == "settings":
+            draw_text(self.screen, self.font_shop_item, "OPTIONS", (box.x + 16, box.y + 16), C_TEXT, shadow=False)
 
             opt_w = 220
             opt_h = 46
-            opt_y = options_box.y + 30
+            opt_y = box.y + 52
             opt_gap = 16
-            opt_x = options_box.x + 12
+            opt_x = box.x + 16
 
             def draw_option(label, value_on, on_click, x):
                 rect = pygame.Rect(x, opt_y, opt_w, opt_h)
@@ -3934,18 +4004,24 @@ class Game:
             draw_option("Screen Shake", bool(self.save.settings.get("shake", True)), lambda: self.toggle_setting("shake"), opt_x)
             draw_option("Audio", bool(self.save.settings.get("audio", True)), lambda: self.toggle_setting("audio"), opt_x + opt_w + opt_gap)
 
+            reset_y = opt_y + opt_h + 40
+            draw_text(self.screen, self.font_shop_item, "RESET", (box.x + 16, reset_y), C_TEXT, shadow=False)
+
+            reset_btn_y = reset_y + 34
+            reset_w = 240
+            reset_h = 46
+            reset_gap = 16
+            reset_x = box.x + 16
+
+            reset_settings_btn = Button(pygame.Rect(reset_x, reset_btn_y, reset_w, reset_h), "Defaults", self.reset_settings)
+            reset_cosmetics_btn = Button(pygame.Rect(reset_x + reset_w + reset_gap, reset_btn_y, reset_w, reset_h), "Reset Cosmetics", self.reset_cosmetics)
+
+            for btn in (reset_settings_btn, reset_cosmetics_btn):
+                btn.update(1 / 60, mouse_pos, mouse_down, events)
+                btn.draw(self.screen, self.font_shop_small)
+
             self.shop_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
             self.shop_back_btn.draw(self.screen, self.font_med)
-
-            self.shop_prev_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.shop_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.shop_prev_btn.draw(self.screen, self.font_med)
-            self.shop_next_btn.draw(self.screen, self.font_med)
-
-            page_txt = f"Page {self.shop_page + 1}/{total_pages}"
-            mid_x = (self.shop_prev_btn.rect.centerx + self.shop_next_btn.rect.centerx) // 2
-            below_y = self.shop_prev_btn.rect.bottom + 10
-            draw_text(self.screen, self.font_tiny, page_txt, (mid_x, below_y), C_TEXT_DIM, center=True, shadow=False)
             return
 
         if self.shop_tab == "bundles":
