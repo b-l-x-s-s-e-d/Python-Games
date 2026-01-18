@@ -181,6 +181,22 @@
 
 ---
 
+## v1.6.1 -- Story Mode Polish
+### Imrpovements
+- Removed the cyan overlay in the Leaderboard tab
+- Changed 1st, 2nd, 3rd etc. place numbers to white
+- Story Mode adjustments and polishes
+  - Level 1: Was already balanced; no changes were made
+  - Level 2: Kill target was changed to 25
+  - Level 3: Enemies outside the circle were made completely invisible until they entered the player’s circle range by making the outside of the circle opaque
+  - Level 4: Enemies were made to only attack the beacon, which was set to 20 HP
+  - Level 5: Hazard zones were changed to randomly generate each time the level starts, with only two zones allowed and no overlap with obstacles
+  - Level 6: The boss fight was made to start instantly, and the boss was given two special attacks:
+    - A dash attack
+    - A rocket strike from the sky
+  - Universal Changes: The difficulty ramping of Levels 2, 3, 4, and 5 was decreased by 50%
+
+---
 
 ## To-Do Features
 
@@ -199,18 +215,3 @@
 
 
 ## Urgent Fixes
-
-- Remove the cyan overlay in the Leaderboard tab
-- Change 1st, 2nd, and 3rd place numbers to white in the Leaderboard
-- Story Mode fixes:
-  - Level 1: Balanced, no changes needed)
-  - Level 2: Change kill target to 25
-  - Level 3: Make enemies out of the circle completely invisible until they are within the circle's range of the player (by making the outside of the circle opaque)
-  - Level 4: Make enemies only attack the beacon, which has 20hp
-  - Level 5: There are only 2 hazard zones in the whole map, so make them randomly generate every time you start level 5. But never let them overlap obstacles
-  - Level 6: Make the boss fight start instantly. And make this boss have 2 special attacks. Like a dash, and a rocket falls from the sky
-  - Universal: Decrease the difficulty of levels 2, 3, 4, and 5 by 50%
-
-
-
-
