@@ -8,10 +8,11 @@ To run the Tank Game correctly and ensure your progress saves, you **must clone 
 
 ## Download All Requirements
 
-1. Press: `🪟 + R`
-2. Type: `CMD`
-3. Run this command to download requirements: `pip install pygame`
-4. Wait until all requirements are successfully downloaded
+1. Install the **latest Python version**
+2. Press: `🪟 + R`
+3. Type: `CMD`
+4. Run this command to download requirements: `pip install pygame`
+5. Wait until all requirements are successfully downloaded
 
 ---
 
