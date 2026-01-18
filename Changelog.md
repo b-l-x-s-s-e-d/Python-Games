@@ -2,8 +2,7 @@
 
 ---
 
-
-## Archived Updates
+## Old Updates
 - v1.1  
 - v1.2  
 - v1.2.1  
@@ -34,7 +33,6 @@
 
 ---
 
-
 ## v1.3.2 -- Tank Balance Update
 
 ### New Features
@@ -48,7 +46,6 @@
 
 ---
 
-
 ## v1.3.3 -- Boss Balance Update
 
 ### Gameplay
@@ -56,7 +53,6 @@
 - Boss bullet speed reduced from **310 → 270**
 
 ---
-
 
 ## v1.3.4 -- Leaderboard & Bug Fixes
 
@@ -68,16 +64,6 @@
 - Fixed a crash occurring when opening the game
 
 ---
-
-
-
-
-
-
-
-
-
-
 
 ## v1.4 -- Progression and Shop Update
 
@@ -188,4 +174,5 @@
 - Make ALL numbers (1 - 10) on the Leaderboard white
 - In Story Mode, move the objective bar to the top, but make sure none of the tabs overlay
 - On Level 4 in Story Mode, give the Beacon 5 extra hp and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
+
 
