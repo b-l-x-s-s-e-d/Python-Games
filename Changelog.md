@@ -8,46 +8,11 @@
 - v1.2  
 - v1.2.1  
 - v1.2.2  
-- v1.2.3  
+- v1.2.3
+- v1.2.4
+- v1.3
 
 ---
-
-
-## v1.2.4 -- Gameplay Balance Update
-
-### New Features
-- Working on a BIG update :3
-
-### Gameplay
-- Ranged enemy damage decreased from **3 HP → 2 HP**  
-  - Hard mode: **7 HP → 3 HP**
-- Increased grace time after killing the boss from **2.5 → 3**
-- Difficulty ramp time decreased
-- Increased all powerup durations
-- Max enemy limit decreased
-- Coins per wave increased from **2 → 4**
-
----
-
-
-## v1.3 -- Weapons and Gameplay Update
-
-### New Features
-- Added **Flamethrower Tank**
-- Added **Omni Pistol Tank**
-- Added **Auto-Fire** with a visual indicator
-- Added a **Boss Tracker** that points toward the boss (when applicable)
-
-### Gameplay
-- Sniper bullet speed increased from **1450 → 1500**
-- Sniper bullet radius decreased from **4 → 3**
-- Wave duration reduced from **18s → 13s**
-- Boss default damage reduced from **6 HP → 2 HP**
-- Boss bullet speed reduced from **420 → 310**
-- Tesla fire cooldown reduced from **0.22 → 0.21**
-
----
-
 
 ## v1.3.1 -- Gameplay Update #2
 
@@ -105,6 +70,15 @@
 ---
 
 
+
+
+
+
+
+
+
+
+
 ## v1.4 -- Progression and Shop Update
 
 ### New Features
@@ -114,7 +88,6 @@
 - Added a **Weapon Mastery** tab
 
 ---
-
 
 ## v1.4.1 -- UI Stability Update
 
@@ -126,7 +99,6 @@
 
 ---
 
-
 ## v1.4.2 -- Progression Adjustments
 
 ### Improvements
@@ -136,7 +108,6 @@
 - Story Mode currently in development :3
 
 ---
-
 
 ## v1.5 -- Quality of Life Improvements
 
@@ -161,7 +132,6 @@
 - Fixed piercing upgrades not working on some tanks
 
 ---
-
 
 ## v1.5.1 -- Game Code Improvements
 
@@ -218,3 +188,4 @@
 - Make ALL numbers (1 - 10) on the Leaderboard white
 - In Story Mode, move the objective bar to the top, but make sure none of the tabs overlay
 - On Level 4 in Story Mode, give the Beacon 5 extra hp and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
+
