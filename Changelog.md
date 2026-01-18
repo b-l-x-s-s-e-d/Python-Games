@@ -201,7 +201,16 @@
 ## Urgent Fixes
 
 - Remove the cyan overlay in the Leaderboard tab
-- Change 1st, 2nd, and 3rd place numbers to white
+- Change 1st, 2nd, and 3rd place numbers to white in the Leaderboard
+- Story Mode fixes:
+  - Level 1: Balanced, no changes needed)
+  - Level 2: Change kill target to 25
+  - Level 3: Make enemies out of the circle completely invisible until they are within the circle's range of the player (by making the outside of the circle opaque)
+  - Level 4: Make enemies only attack the beacon, which has 20hp
+  - Level 5: There are only 2 hazard zones in the whole map, so make them randomly generate every time you start level 5. But never let them overlap obstacles
+  - Level 6: Make the boss fight start instantly. And make this boss have 2 special attacks. Like a dash, and a rocket falls from the sky
+  - Universal: Decrease the difficulty of levels 2, 3, 4, and 5 by 50%
+
 
 
 
