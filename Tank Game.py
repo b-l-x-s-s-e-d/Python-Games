@@ -3,10 +3,14 @@
 # Asset-free: all visuals are shapes; audio is optional and fallback-safe.
 #
 # CHANGES (this pass):
-# ✅ Weapons screen now shows ALL weapons (paginated) so you can equip any purchased weapon
-# ✅ Future-proof: save file auto-syncs weapon unlock keys with WEAPONS dict (new weapons won't "disappear")
-# ✅ QoL: clicking a locked weapon shows a “Locked — buy in Shop” hint
-# ✅ Minor safety: weapon page clamping + selected weapon validation
+# ✅ Added Story Mode with 6 config-driven levels, progression, and HUD objectives.
+# ✅ Story progress is saved alongside existing save data (new keys only).
+#
+# STORY MODE NOTES:
+# - Access: Main Menu → Story Mode (button under Start Run). Use Continue or select a level.
+# - Level configs: See LEVELS list (name, objective, win condition, arena, spawn, enemy weights, and special rules).
+# - Implemented twists: tighter arenas, ranged-heavy ambush, low-visibility "night" run,
+#   defend-the-beacon objective, hazard zones, and a boss finale.
 
 import os
 import sys
@@ -182,6 +186,89 @@ AUDIO_ENABLED_DEFAULT = True
 BOSS_EVERY_WAVES = 10
 BOSS_GRACE_AFTER_DEATH = 3  # seconds where normal spawning is paused after boss dies
 
+# =========================================================
+# STORY MODE CONFIG
+# =========================================================
+LEVELS = [
+    {
+        "id": 1,
+        "name": "Outskirts Run",
+        "objective": "Survive 35 seconds.",
+        "win": {"type": "survive", "seconds": 35},
+        "arena_size": (2400, 2400),
+        "obstacles": {"count": 14, "min": (90, 70), "max": (200, 160)},
+        "spawn": {"interval": 1.25, "cap": 8},
+        "enemy_weights": {"chaser": 0.7, "sprinter": 0.3},
+        "special": {},
+        "difficulty": 0.25,
+    },
+    {
+        "id": 2,
+        "name": "Lockdown Lanes",
+        "objective": "Eliminate 35 enemies. (Pistol-only)",
+        "win": {"type": "kills", "count": 35},
+        "arena_size": (2000, 1300),
+        "obstacles": {"count": 26, "min": (80, 80), "max": (220, 180)},
+        "spawn": {"interval": 1.1, "cap": 10},
+        "enemy_weights": {"chaser": 0.55, "ranged": 0.25, "sprinter": 0.2},
+        "special": {"forced_weapon": "pistol"},
+        "difficulty": 0.35,
+    },
+    {
+        "id": 3,
+        "name": "Nightglass",
+        "objective": "Survive 45 seconds in the dark.",
+        "win": {"type": "survive", "seconds": 45},
+        "arena_size": (2300, 2300),
+        "obstacles": {"count": 18, "min": (90, 70), "max": (210, 170)},
+        "spawn": {"interval": 1.05, "cap": 11},
+        "enemy_weights": {"chaser": 0.4, "ranged": 0.4, "sprinter": 0.2},
+        "special": {"visibility_radius": 260},
+        "difficulty": 0.42,
+    },
+    {
+        "id": 4,
+        "name": "Beacon Hold",
+        "objective": "Defend the beacon for 30 seconds.",
+        "win": {"type": "defend", "seconds": 30, "radius": 150},
+        "arena_size": (2200, 2000),
+        "obstacles": {"count": 20, "min": (90, 70), "max": (200, 150)},
+        "spawn": {"interval": 1.05, "cap": 12},
+        "enemy_weights": {"chaser": 0.45, "ranged": 0.35, "tank": 0.2},
+        "special": {"objective_point": "center"},
+        "difficulty": 0.5,
+    },
+    {
+        "id": 5,
+        "name": "Static Fields",
+        "objective": "Reach 50 kills while avoiding hazard zones.",
+        "win": {"type": "kills", "count": 50},
+        "arena_size": (2500, 2100),
+        "obstacles": {"count": 16, "min": (100, 80), "max": (240, 190)},
+        "spawn": {"interval": 0.95, "cap": 13},
+        "enemy_weights": {"chaser": 0.35, "ranged": 0.35, "sprinter": 0.15, "dasher": 0.15},
+        "special": {
+            "hazards": [
+                {"rect": (-420, -260, 320, 520), "dps": 1.0},
+                {"rect": (200, -180, 320, 360), "dps": 1.2},
+            ]
+        },
+        "difficulty": 0.6,
+    },
+    {
+        "id": 6,
+        "name": "Overclocked Core",
+        "objective": "Defeat the Overlord.",
+        "win": {"type": "boss", "spawn_after": 8},
+        "arena_size": (2200, 2200),
+        "obstacles": {"count": 10, "min": (120, 90), "max": (220, 180)},
+        "spawn": {"interval": 1.4, "cap": 6},
+        "enemy_weights": {"chaser": 0.4, "ranged": 0.4, "tank": 0.2},
+        "special": {},
+        "difficulty": 0.7,
+    },
+]
+
 
 # =========================================================
 # HELPERS
@@ -197,6 +284,20 @@ def lerp(a, b, t):
 def smoothstep(t: float) -> float:
     t = clamp(t, 0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
+
+
+def weighted_choice(weights: Dict[str, float]) -> str:
+    total = sum(max(0.0, v) for v in weights.values())
+    if total <= 0:
+        return random.choice(list(weights.keys()))
+    r = random.uniform(0.0, total)
+    upto = 0.0
+    for k, v in weights.items():
+        w = max(0.0, v)
+        upto += w
+        if r <= upto:
+            return k
+    return list(weights.keys())[-1]
 
 
 def draw_text(surf, font, text, pos, color=C_TEXT, center=False, shadow=True):
@@ -292,6 +393,8 @@ class SaveManager:
         self.weapon_mastery: Dict[str, Dict[str, int]] = {}
         self.settings: Dict[str, bool] = {"audio": True, "shake": True}
         self.leaderboard: List[Dict[str, int]] = []
+        self.story_unlocked_level: int = 1
+        self.story_last_level: int = 1
         self.load()
 
     def defaults(self):
@@ -317,6 +420,8 @@ class SaveManager:
         self.weapon_mastery = {}
         self.settings = {"audio": True, "shake": True}
         self.leaderboard = []
+        self.story_unlocked_level = 1
+        self.story_last_level = 1
 
     def ensure_weapons(self, weapon_ids: List[str]) -> bool:
         """Future-proof: ensure save file contains keys for every weapon in WEAPONS."""
@@ -435,6 +540,8 @@ class SaveManager:
             self.weapon_mastery = dict(data.get("weapon_mastery", {}))
             self.settings = dict(data.get("settings", self.settings))
             self.leaderboard = list(data.get("leaderboard", []))
+            self.story_unlocked_level = int(data.get("story_unlocked_level", 1))
+            self.story_last_level = int(data.get("story_last_level", self.story_unlocked_level))
 
             for k in ["meta_damage", "meta_move", "meta_hp", "meta_xp", "meta_dash", "meta_armor", "meta_bulletspeed"]:
                 if k not in self.shop_levels:
@@ -444,6 +551,16 @@ class SaveManager:
                 self.settings["audio"] = True
             if "shake" not in self.settings:
                 self.settings["shake"] = True
+
+            if self.story_unlocked_level < 1:
+                self.story_unlocked_level = 1
+            if self.story_last_level < 1:
+                self.story_last_level = self.story_unlocked_level
+            max_story = max(1, len(LEVELS))
+            if self.story_unlocked_level > max_story:
+                self.story_unlocked_level = max_story
+            if self.story_last_level > max_story:
+                self.story_last_level = self.story_unlocked_level
 
             if "pistol" not in self.weapon_unlocks:
                 self.weapon_unlocks["pistol"] = True
@@ -493,6 +610,8 @@ class SaveManager:
                 "weapon_mastery": self.weapon_mastery,
                 "settings": self.settings,
                 "leaderboard": self.leaderboard,
+                "story_unlocked_level": int(self.story_unlocked_level),
+                "story_last_level": int(self.story_last_level),
             }
             with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -1566,8 +1685,9 @@ class Player:
                 self.vel.scale_to_length(max_sp)
 
         self.pos += self.vel * dt
-        self.pos.x = clamp(self.pos.x, PLAYER_RADIUS, ARENA_W - PLAYER_RADIUS)
-        self.pos.y = clamp(self.pos.y, PLAYER_RADIUS, ARENA_H - PLAYER_RADIUS)
+        arena = game.arena_rect
+        self.pos.x = clamp(self.pos.x, arena.left + PLAYER_RADIUS, arena.right - PLAYER_RADIUS)
+        self.pos.y = clamp(self.pos.y, arena.top + PLAYER_RADIUS, arena.bottom - PLAYER_RADIUS)
 
         game.resolve_player_walls()
 
@@ -1657,13 +1777,37 @@ class Game:
         self.state = "menu"  # menu, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
         self.running = True
 
+        # Mode
+        self.mode = "endless"  # endless / story
+
+        # Story mode
+        self.story_level_index = 1
+        self.story_config: Optional[Dict[str, object]] = None
+        self.story_start_time = 0.0
+        self.story_elapsed = 0.0
+        self.story_kills = 0
+        self.story_defend_progress = 0.0
+        self.story_defend_required = 0.0
+        self.story_defend_radius = 0.0
+        self.story_defend_point: Optional[Vector2] = None
+        self.story_objective_text = ""
+        self.story_boss_spawned = False
+        self.story_boss_defeated = False
+        self.story_visibility_radius: Optional[int] = None
+        self.story_hazard_zones: List[Dict[str, object]] = []
+        self.story_hazard_accum = 0.0
+        self.story_level_complete_stats: Dict[str, int] = {}
+        self.story_forced_weapon: Optional[str] = None
+
+        self.arena_rect = pygame.Rect(0, 0, ARENA_W, ARENA_H)
+
         # Camera
         self.cam = Vector2(0, 0)
         self.shake = 0.0
         self.shake_vec = Vector2(0, 0)
 
         # Entities
-        self.player = Player(Vector2(ARENA_W / 2, ARENA_H / 2), weapon_id=self.save.selected_weapon)
+        self.player = Player(Vector2(self.arena_rect.centerx, self.arena_rect.centery), weapon_id=self.save.selected_weapon)
         self.player.outline_color = self.get_outline_color()
         self.projectiles: List[Projectile] = []
         self.enemy_projectiles: List[Projectile] = []
@@ -1706,6 +1850,12 @@ class Game:
         self.leaderboard_back_btn: Optional[Button] = None
         self.settings_back_btn: Optional[Button] = None
         self.challenges_back_btn: Optional[Button] = None
+        self.story_back_btn: Optional[Button] = None
+        self.story_continue_btn: Optional[Button] = None
+        self.story_level_buttons: List[Button] = []
+        self.story_complete_next_btn: Optional[Button] = None
+        self.story_complete_menu_btn: Optional[Button] = None
+        self.story_fail_buttons: List[Button] = []
         self.challenges_view = "daily"
         self.challenge_tabs: List[TabButton] = []
         self.pause_buttons: List[Button] = []
@@ -1772,13 +1922,37 @@ class Game:
     # ---------------- World ----------------
     def _generate_obstacles(self):
         self.obstacles.clear()
-        safe = pygame.Rect(int(ARENA_W / 2 - 260), int(ARENA_H / 2 - 200), 520, 400)
+        safe = pygame.Rect(int(self.arena_rect.centerx - 260), int(self.arena_rect.centery - 200), 520, 400)
 
         for _ in range(OBSTACLE_COUNT):
             w = random.randint(OBSTACLE_MIN[0], OBSTACLE_MAX[0])
             h = random.randint(OBSTACLE_MIN[1], OBSTACLE_MAX[1])
-            x = random.randint(80, ARENA_W - w - 80)
-            y = random.randint(80, ARENA_H - h - 80)
+            x = random.randint(self.arena_rect.left + 80, self.arena_rect.right - w - 80)
+            y = random.randint(self.arena_rect.top + 80, self.arena_rect.bottom - h - 80)
+            r = pygame.Rect(x, y, w, h)
+            if r.colliderect(safe):
+                continue
+            ok = True
+            for o in self.obstacles:
+                if r.inflate(40, 40).colliderect(o):
+                    ok = False
+                    break
+            if ok:
+                self.obstacles.append(r)
+
+    def _generate_story_obstacles(self, config: Dict[str, object]):
+        self.obstacles.clear()
+        obstacle_cfg = config.get("obstacles", {})
+        count = int(obstacle_cfg.get("count", OBSTACLE_COUNT))
+        min_size = obstacle_cfg.get("min", OBSTACLE_MIN)
+        max_size = obstacle_cfg.get("max", OBSTACLE_MAX)
+        safe = pygame.Rect(int(self.arena_rect.centerx - 260), int(self.arena_rect.centery - 200), 520, 400)
+
+        for _ in range(count):
+            w = random.randint(min_size[0], max_size[0])
+            h = random.randint(min_size[1], max_size[1])
+            x = random.randint(self.arena_rect.left + 80, self.arena_rect.right - w - 80)
+            y = random.randint(self.arena_rect.top + 80, self.arena_rect.bottom - h - 80)
             r = pygame.Rect(x, y, w, h)
             if r.colliderect(safe):
                 continue
@@ -1794,15 +1968,16 @@ class Game:
     def _build_menus(self):
         cx = WIDTH // 2
         bw, bh = 340, 56
-        top = 278
-        gap = 68
+        top = 240
+        gap = 58
 
         self.menu_buttons = [
             Button(pygame.Rect(cx - bw // 2, top + gap * 0, bw, bh), "Start Run", self.start_run),
-            Button(pygame.Rect(cx - bw // 2, top + gap * 1, bw, bh), "Weapons", self.open_weapons_screen),
-            Button(pygame.Rect(cx - bw // 2, top + gap * 2, bw, bh), "Shop", self.open_shop),
-            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Settings", self.open_settings),
-            Button(pygame.Rect(cx - bw // 2, top + gap * 4, bw, bh), "Leaderboard", self.open_leaderboard),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 1, bw, bh), "Story Mode", self.open_story_menu),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 2, bw, bh), "Weapons", self.open_weapons_screen),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 3, bw, bh), "Shop", self.open_shop),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 4, bw, bh), "Settings", self.open_settings),
+            Button(pygame.Rect(cx - bw // 2, top + gap * 5, bw, bh), "Leaderboard", self.open_leaderboard),
         ]
         self.menu_quit_btn = Button(
             pygame.Rect(20, 18, 54, 48),
@@ -1820,6 +1995,33 @@ class Game:
         self.leaderboard_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.settings_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.story_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
+        self.story_continue_btn = Button(pygame.Rect(WIDTH - 260, HEIGHT - 80, 220, 52), "Continue", self.start_story_continue)
+
+        self.story_level_buttons = []
+        story_cols = 2
+        story_bw, story_bh = 380, 56
+        story_gap_x = 30
+        story_gap_y = 18
+        total_w = story_cols * story_bw + (story_cols - 1) * story_gap_x
+        start_x = WIDTH // 2 - total_w // 2
+        start_y = 220
+        for idx, level in enumerate(LEVELS):
+            col = idx % story_cols
+            row = idx // story_cols
+            rect = pygame.Rect(
+                start_x + col * (story_bw + story_gap_x),
+                start_y + row * (story_bh + story_gap_y),
+                story_bw,
+                story_bh,
+            )
+            btn = Button(rect, f"Level {idx + 1}: {level['name']}", callback=lambda i=idx + 1: self.start_story_level(i))
+            self.story_level_buttons.append(btn)
+
+        self.story_complete_next_btn = Button(pygame.Rect(WIDTH // 2 - 170, HEIGHT // 2 + 120, 340, 56),
+                                              "Next Level", self.start_next_story_level)
+        self.story_complete_menu_btn = Button(pygame.Rect(WIDTH // 2 - 170, HEIGHT // 2 + 190, 340, 56),
+                                              "Back to Menu", lambda: self.set_state("menu"))
 
         # Weapons pagination buttons (bottom-right)
         self.weapon_prev_btn = Button(pygame.Rect(WIDTH - 300, HEIGHT - 80, 120, 52), "Prev", lambda: self.change_weapon_page(-1))
@@ -1834,6 +2036,10 @@ class Game:
 
         self.gameover_buttons = [
             Button(pygame.Rect(cx - bw // 2, py + 60, bw, bh), "Restart (R)", self.start_run, hotkey=pygame.K_r),
+            Button(pygame.Rect(cx - bw // 2, py + 130, bw, bh), "Menu", lambda: self.set_state("menu")),
+        ]
+        self.story_fail_buttons = [
+            Button(pygame.Rect(cx - bw // 2, py + 60, bw, bh), "Retry (R)", self.retry_story_level, hotkey=pygame.K_r),
             Button(pygame.Rect(cx - bw // 2, py + 130, bw, bh), "Menu", lambda: self.set_state("menu")),
         ]
 
@@ -1945,6 +2151,157 @@ class Game:
     def open_challenges(self):
         self.challenges_view = "daily"
         self.set_state("challenges")
+
+    # ---------------- Story Mode ----------------
+    def open_story_menu(self):
+        self.set_state("story_menu")
+
+    def story_levels_count(self) -> int:
+        return len(LEVELS)
+
+    def get_unlocked_story_level(self) -> int:
+        return max(1, min(int(self.save.story_unlocked_level), self.story_levels_count()))
+
+    def get_story_continue_level(self) -> int:
+        unlocked = self.get_unlocked_story_level()
+        last = max(1, min(int(self.save.story_last_level), self.story_levels_count()))
+        return last if last <= unlocked else unlocked
+
+    def start_story_continue(self):
+        self.start_story_level(self.get_story_continue_level())
+
+    def start_next_story_level(self):
+        if self.story_level_index < self.story_levels_count():
+            self.start_story_level(self.story_level_index + 1)
+        else:
+            self.set_state("menu")
+
+    def retry_story_level(self):
+        self.start_story_level(self.story_level_index)
+
+    def start_story_level(self, level_index: int):
+        level_index = max(1, min(level_index, self.story_levels_count()))
+        config = LEVELS[level_index - 1]
+        self.mode = "story"
+        self.story_level_index = level_index
+        self.story_config = config
+        self.set_state("playing")
+
+        size = config.get("arena_size", (ARENA_W, ARENA_H))
+        self.arena_rect = pygame.Rect(
+            (ARENA_W - size[0]) // 2,
+            (ARENA_H - size[1]) // 2,
+            size[0],
+            size[1],
+        )
+
+        self.save.ensure_weapons(list(WEAPONS.keys()))
+        forced_weapon = config.get("special", {}).get("forced_weapon")
+        self.story_forced_weapon = forced_weapon
+        weapon_id = forced_weapon or self.save.selected_weapon
+        if not self.save.weapon_unlocks.get(weapon_id, False):
+            weapon_id = "pistol"
+
+        self.player = Player(Vector2(self.arena_rect.centerx, self.arena_rect.centery), weapon_id=weapon_id)
+        self.apply_meta_upgrades_to_player()
+        self.player.outline_color = self.get_outline_color()
+        self.counted_game = False
+
+        self.projectiles.clear()
+        self.enemy_projectiles.clear()
+        self.enemies.clear()
+        self.pickups.clear()
+        self.particles.clear()
+        self.float_texts.clear()
+
+        self._generate_story_obstacles(config)
+
+        self.start_time = time.time()
+        self.survival_time = 0.0
+        self.wave = 1
+        self.wave_timer = WAVE_TIME_BASE
+        self.spawn_timer = 0.0
+        self.spawn_interval = float(config.get("spawn", {}).get("interval", SPAWN_RATE_BASE))
+
+        self.difficulty = float(config.get("difficulty", 0.35))
+        self.diff_eased = self.difficulty
+
+        self.shake = 0.0
+        self.powerup_timer = random.uniform(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX)
+
+        self.last_run_coins_earned = 0
+        self.coins_awarded_this_gameover = False
+        self.run_bonus_coins = 0
+        self.leaderboard_recorded = False
+
+        self.in_boss_fight = False
+        self.boss_alive = False
+        self.boss_banner_timer = 0.0
+        self.boss_grace_timer = 0.0
+
+        self.story_start_time = time.time()
+        self.story_elapsed = 0.0
+        self.story_kills = 0
+        self.story_defend_progress = 0.0
+        win_cfg = config.get("win", {})
+        self.story_defend_required = float(win_cfg.get("seconds", 0)) if win_cfg.get("type") == "defend" else 0.0
+        self.story_defend_radius = float(win_cfg.get("radius", 0)) if win_cfg.get("type") == "defend" else 0.0
+        self.story_objective_text = str(config.get("objective", ""))
+        self.story_boss_spawned = False
+        self.story_boss_defeated = False
+        self.story_visibility_radius = config.get("special", {}).get("visibility_radius")
+        self.story_hazard_zones = []
+        self.story_hazard_accum = 0.0
+
+        objective_point = config.get("special", {}).get("objective_point")
+        if objective_point == "center":
+            self.story_defend_point = Vector2(self.arena_rect.centerx, self.arena_rect.centery)
+        else:
+            self.story_defend_point = None
+
+        hazards = config.get("special", {}).get("hazards", [])
+        if hazards:
+            center = Vector2(self.arena_rect.centerx, self.arena_rect.centery)
+            for hz in hazards:
+                rect = hz.get("rect", (0, 0, 100, 100))
+                rect_abs = pygame.Rect(
+                    int(center.x + rect[0]),
+                    int(center.y + rect[1]),
+                    int(rect[2]),
+                    int(rect[3]),
+                )
+                self.story_hazard_zones.append({"rect": rect_abs, "dps": float(hz.get("dps", 1.0))})
+
+        self.save.story_last_level = level_index
+        self.save.save()
+
+    def unlock_next_story_level(self):
+        unlocked = self.get_unlocked_story_level()
+        if self.story_level_index >= unlocked and self.story_level_index < self.story_levels_count():
+            self.save.story_unlocked_level = self.story_level_index + 1
+        if self.story_level_index >= self.story_levels_count():
+            self.save.story_unlocked_level = self.story_levels_count()
+        self.save.story_last_level = min(self.story_level_index + 1, self.story_levels_count())
+        self.save.save()
+
+    def story_objective_progress_text(self) -> str:
+        if not self.story_config:
+            return ""
+        win_cfg = self.story_config.get("win", {})
+        win_type = win_cfg.get("type")
+        if win_type == "survive":
+            seconds = int(win_cfg.get("seconds", 0))
+            return f"{self.story_objective_text} ({int(min(self.story_elapsed, seconds))}/{seconds}s)"
+        if win_type == "kills":
+            count = int(win_cfg.get("count", 0))
+            return f"{self.story_objective_text} ({min(self.story_kills, count)}/{count})"
+        if win_type == "defend":
+            required = int(self.story_defend_required)
+            current = int(min(self.story_defend_progress, self.story_defend_required))
+            return f"{self.story_objective_text} ({current}/{required}s)"
+        if win_type == "boss":
+            return self.story_objective_text
+        return self.story_objective_text
 
     # ---------------- Cosmetics ----------------
     def get_cosmetic(self, cosmetic_id: str) -> Optional[CosmeticDef]:
@@ -2352,13 +2709,20 @@ class Game:
 
     # ---------------- Run reset ----------------
     def start_run(self):
+        self.mode = "endless"
         self.set_state("playing")
+        self.arena_rect = pygame.Rect(0, 0, ARENA_W, ARENA_H)
+        self.story_config = None
+        self.story_visibility_radius = None
+        self.story_hazard_zones = []
+        self.story_defend_point = None
+        self.story_forced_weapon = None
 
         # Always ensure weapon keys are synced before starting
         self.save.ensure_weapons(list(WEAPONS.keys()))
         weapon_id = self.save.selected_weapon if self.save.weapon_unlocks.get(self.save.selected_weapon, False) else "pistol"
 
-        self.player = Player(Vector2(ARENA_W / 2, ARENA_H / 2), weapon_id=weapon_id)
+        self.player = Player(Vector2(self.arena_rect.centerx, self.arena_rect.centery), weapon_id=weapon_id)
         self.apply_meta_upgrades_to_player()
         self.counted_game = False
 
@@ -2457,8 +2821,9 @@ class Game:
                 push = d / dist * (radius - dist)
                 cpos += push
 
-        cpos.x = clamp(cpos.x, radius, ARENA_W - radius)
-        cpos.y = clamp(cpos.y, radius, ARENA_H - radius)
+        arena = self.arena_rect
+        cpos.x = clamp(cpos.x, arena.left + radius, arena.right - radius)
+        cpos.y = clamp(cpos.y, arena.top + radius, arena.bottom - radius)
 
     def bullet_hits_wall(self, bullet: Projectile) -> bool:
         p = bullet.pos
@@ -2493,8 +2858,9 @@ class Game:
             if dd.length_squared() < (min_dist * min_dist):
                 enemy.pos = p + (dd.normalize() if dd.length_squared() > 1e-8 else n) * min_dist
 
-            enemy.pos.x = clamp(enemy.pos.x, enemy.radius, ARENA_W - enemy.radius)
-            enemy.pos.y = clamp(enemy.pos.y, enemy.radius, ARENA_H - enemy.radius)
+            arena = self.arena_rect
+            enemy.pos.x = clamp(enemy.pos.x, arena.left + enemy.radius, arena.right - enemy.radius)
+            enemy.pos.y = clamp(enemy.pos.y, arena.top + enemy.radius, arena.bottom - enemy.radius)
 
     # ---------------- Shooting + special weapon mechanics ----------------
     def spawn_player_shot(self, player: Player):
@@ -2606,16 +2972,17 @@ class Game:
         ang = random.uniform(0, math.tau)
         spawn = player.pos + Vector2(math.cos(ang), math.sin(ang)) * dist
 
-        spawn.x = clamp(spawn.x, 60, ARENA_W - 60)
-        spawn.y = clamp(spawn.y, 60, ARENA_H - 60)
+        arena = self.arena_rect
+        spawn.x = clamp(spawn.x, arena.left + 60, arena.right - 60)
+        spawn.y = clamp(spawn.y, arena.top + 60, arena.bottom - 60)
 
         attempts = 14
         while attempts > 0:
             if any(r.inflate(40, 40).collidepoint(spawn.x, spawn.y) for r in self.obstacles):
                 ang = random.uniform(0, math.tau)
                 spawn = player.pos + Vector2(math.cos(ang), math.sin(ang)) * dist
-                spawn.x = clamp(spawn.x, 60, ARENA_W - 60)
-                spawn.y = clamp(spawn.y, 60, ARENA_H - 60)
+                spawn.x = clamp(spawn.x, arena.left + 60, arena.right - 60)
+                spawn.y = clamp(spawn.y, arena.top + 60, arena.bottom - 60)
                 attempts -= 1
             else:
                 break
@@ -2648,15 +3015,16 @@ class Game:
         dist = 620
         ang = random.uniform(0, math.tau)
         pos = self.player.pos + Vector2(math.cos(ang), math.sin(ang)) * dist
-        pos.x = clamp(pos.x, 120, ARENA_W - 120)
-        pos.y = clamp(pos.y, 120, ARENA_H - 120)
+        arena = self.arena_rect
+        pos.x = clamp(pos.x, arena.left + 120, arena.right - 120)
+        pos.y = clamp(pos.y, arena.top + 120, arena.bottom - 120)
 
         tries = 24
         while tries > 0 and any(r.inflate(60, 60).collidepoint(pos.x, pos.y) for r in self.obstacles):
             ang = random.uniform(0, math.tau)
             pos = self.player.pos + Vector2(math.cos(ang), math.sin(ang)) * dist
-            pos.x = clamp(pos.x, 120, ARENA_W - 120)
-            pos.y = clamp(pos.y, 120, ARENA_H - 120)
+            pos.x = clamp(pos.x, arena.left + 120, arena.right - 120)
+            pos.y = clamp(pos.y, arena.top + 120, arena.bottom - 120)
             tries -= 1
 
         stage = max(1, self.wave // BOSS_EVERY_WAVES)
@@ -2694,8 +3062,9 @@ class Game:
             ang = random.uniform(0, math.tau)
             rad = random.uniform(10, 120)
             p = center + Vector2(math.cos(ang), math.sin(ang)) * rad
-            p.x = clamp(p.x, 40, ARENA_W - 40)
-            p.y = clamp(p.y, 40, ARENA_H - 40)
+            arena = self.arena_rect
+            p.x = clamp(p.x, arena.left + 40, arena.right - 40)
+            p.y = clamp(p.y, arena.top + 40, arena.bottom - 40)
             self.pickups.append(Pickup(p, "xp", xp_each))
 
         for _ in range(2):
@@ -2733,7 +3102,8 @@ class Game:
 
         attempts = 40
         while attempts > 0:
-            pos = Vector2(random.uniform(80, ARENA_W - 80), random.uniform(80, ARENA_H - 80))
+            arena = self.arena_rect
+            pos = Vector2(random.uniform(arena.left + 80, arena.right - 80), random.uniform(arena.top + 80, arena.bottom - 80))
             if not self.valid_pickup_spawn(pos, min_player_dist=260.0):
                 attempts -= 1
                 continue
@@ -2774,7 +3144,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges"):
+                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges", "story_menu", "story_complete"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -2791,7 +3161,10 @@ class Game:
 
                 elif self.state == "gameover":
                     if e.key == pygame.K_r:
-                        self.start_run()
+                        if self.mode == "story":
+                            self.retry_story_level()
+                        else:
+                            self.start_run()
                     if e.key == pygame.K_ESCAPE:
                         self.set_state("menu")
 
@@ -2813,11 +3186,16 @@ class Game:
         else:
             self.shake_vec = Vector2(0, 0)
 
-        self.cam.x = clamp(self.cam.x, 0, ARENA_W - WIDTH)
-        self.cam.y = clamp(self.cam.y, 0, ARENA_H - HEIGHT)
+        arena = self.arena_rect
+        self.cam.x = clamp(self.cam.x, arena.left, max(arena.left, arena.right - WIDTH))
+        self.cam.y = clamp(self.cam.y, arena.top, max(arena.top, arena.bottom - HEIGHT))
 
     # ---------------- Updates (Playing) ----------------
     def update_playing(self, dt, events):
+        if self.mode == "story":
+            self.update_story_playing(dt, events)
+            return
+
         self.refresh_challenges()
         self.survival_time = time.time() - self.start_time
         self.update_difficulty()
@@ -2907,13 +3285,20 @@ class Game:
         for b in self.enemy_projectiles:
             b.update(dt)
 
+        arena = self.arena_rect
         self.projectiles = [
             b for b in self.projectiles
-            if b.alive() and 0 <= b.pos.x <= ARENA_W and 0 <= b.pos.y <= ARENA_H and not self.bullet_hits_wall(b)
+            if b.alive()
+            and arena.left <= b.pos.x <= arena.right
+            and arena.top <= b.pos.y <= arena.bottom
+            and not self.bullet_hits_wall(b)
         ]
         self.enemy_projectiles = [
             b for b in self.enemy_projectiles
-            if b.alive() and 0 <= b.pos.x <= ARENA_W and 0 <= b.pos.y <= ARENA_H and not self.bullet_hits_wall(b)
+            if b.alive()
+            and arena.left <= b.pos.x <= arena.right
+            and arena.top <= b.pos.y <= arena.bottom
+            and not self.bullet_hits_wall(b)
         ]
 
         cell = ENEMY_SEPARATION_CELL
@@ -2975,6 +3360,199 @@ class Game:
         if self.player.hp <= 0:
             self.player.hp = 0
             self.set_state("gameover")
+
+    def update_story_playing(self, dt, events):
+        self.refresh_challenges()
+        self.story_elapsed = time.time() - self.story_start_time
+        self.survival_time = self.story_elapsed
+
+        self.boss_grace_timer = max(0.0, self.boss_grace_timer - dt)
+        self.boss_banner_timer = max(0.0, self.boss_banner_timer - dt)
+
+        self.try_spawn_powerup(dt)
+
+        spawn_cfg = self.story_config.get("spawn", {}) if self.story_config else {}
+        self.spawn_interval = float(spawn_cfg.get("interval", SPAWN_RATE_BASE))
+        cap_now = int(spawn_cfg.get("cap", ENEMY_CAP_BASE))
+
+        self.spawn_timer -= dt
+        if self.spawn_timer <= 0:
+            self.spawn_timer = self.spawn_interval
+            if len(self.enemies) < cap_now and not self.in_boss_fight:
+                weights = self.story_config.get("enemy_weights", {}) if self.story_config else {}
+                if weights:
+                    kind = weighted_choice(weights)
+                else:
+                    kind = "chaser"
+                self.spawn_enemy(kind)
+
+        win_cfg = self.story_config.get("win", {}) if self.story_config else {}
+        if win_cfg.get("type") == "boss":
+            spawn_after = float(win_cfg.get("spawn_after", 6))
+            if not self.story_boss_spawned and self.story_elapsed >= spawn_after:
+                self.spawn_boss()
+                self.story_boss_spawned = True
+
+        keys = pygame.key.get_pressed()
+        mx, my = pygame.mouse.get_pos()
+        mouse_buttons = pygame.mouse.get_pressed(3)
+
+        move = Vector2(0, 0)
+        if keys[pygame.K_w]:
+            move.y -= 1
+        if keys[pygame.K_s]:
+            move.y += 1
+        if keys[pygame.K_a]:
+            move.x -= 1
+        if keys[pygame.K_d]:
+            move.x += 1
+
+        mouse_world = Vector2(mx, my) + self.cam + self.shake_vec
+        self.player.update(dt, self, move, mouse_world, mouse_buttons, keys)
+
+        trail = self.get_trail_cosmetic()
+        if trail.id != "trail_none" and self.player.vel.length_squared() > 4.0:
+            self.trail_timer -= dt
+            if self.trail_timer <= 0:
+                jitter = Vector2(random.uniform(-6, 6), random.uniform(-6, 6))
+                self.particles.append(Particle(self.player.pos + jitter, -self.player.vel * 0.1, trail.color, life=0.25, radius=2))
+                self.trail_timer = 0.05 if trail.id == "trail_spark" else 0.04
+
+        pickup_dist = PICKUP_ATTRACT_DIST_BASE + self.player.magnet_bonus
+        for p in self.pickups:
+            d = self.player.pos - p.pos
+            dist = d.length()
+            if dist < pickup_dist and dist > 1e-6:
+                p.vel += d.normalize() * PICKUP_ATTRACT_FORCE * dt
+            p.vel *= (1.0 - min(dt * 6.0, 0.5))
+            p.pos += p.vel * dt
+
+        self.pickups = [p for p in self.pickups if not self._handle_pickup_collect(p)]
+
+        for b in self.projectiles:
+            b.update(dt)
+        for b in self.enemy_projectiles:
+            b.update(dt)
+
+        arena = self.arena_rect
+        self.projectiles = [
+            b for b in self.projectiles
+            if b.alive()
+            and arena.left <= b.pos.x <= arena.right
+            and arena.top <= b.pos.y <= arena.bottom
+            and not self.bullet_hits_wall(b)
+        ]
+        self.enemy_projectiles = [
+            b for b in self.enemy_projectiles
+            if b.alive()
+            and arena.left <= b.pos.x <= arena.right
+            and arena.top <= b.pos.y <= arena.bottom
+            and not self.bullet_hits_wall(b)
+        ]
+
+        cell = ENEMY_SEPARATION_CELL
+        buckets: Dict[Tuple[int, int], List[EnemyBase]] = {}
+        for e in self.enemies:
+            key = (int(e.pos.x // cell), int(e.pos.y // cell))
+            buckets.setdefault(key, []).append(e)
+
+        for e in self.enemies:
+            e.hit_flash = max(0.0, e.hit_flash - dt)
+            key = (int(e.pos.x // cell), int(e.pos.y // cell))
+            neighbors: List[EnemyBase] = []
+            for ox in (-1, 0, 1):
+                for oy in (-1, 0, 1):
+                    neighbors.extend(buckets.get((key[0] + ox, key[1] + oy), []))
+            e.apply_separation(dt, neighbors)
+            e.update(dt, self)
+            self.resolve_enemy_player_overlap(e)
+
+        self._handle_bullet_enemy_collisions()
+        self._handle_enemy_bullet_player_collisions()
+        self._handle_enemy_contact_player()
+
+        alive = []
+        for e in self.enemies:
+            if e.alive():
+                alive.append(e)
+            else:
+                if isinstance(e, Boss):
+                    self.on_boss_killed(e)
+                    if win_cfg.get("type") == "boss":
+                        self.story_boss_defeated = True
+                else:
+                    self.player.score += e.score_value
+                    self.story_kills += 1
+                    if e.last_hit_by_player and e.last_hit_weapon_id:
+                        self.update_mastery(e.last_hit_weapon_id, kills=1)
+                        self.update_challenges("kills", 1)
+                        self.update_challenges("weapon_kills", 1, weapon_id=e.last_hit_weapon_id)
+                    self.drop_pickups(Vector2(e.pos))
+        self.enemies = alive
+
+        for pt in self.particles:
+            pt.update(dt)
+        self.particles = [pt for pt in self.particles if pt.life > 0]
+
+        for ft in self.float_texts:
+            ft.update(dt)
+        self.float_texts = [ft for ft in self.float_texts if ft.life > 0]
+
+        if self.progress_dirty:
+            self.progress_dirty_timer += dt
+            if self.progress_dirty_timer >= 2.0:
+                self.save.save()
+                self.progress_dirty = False
+                self.progress_dirty_timer = 0.0
+
+        if self.player.try_level_up():
+            self.audio_play("levelup")
+            self.open_levelup()
+
+        if self.story_defend_point and self.story_defend_radius > 0:
+            dist2 = (self.player.pos - self.story_defend_point).length_squared()
+            if dist2 <= self.story_defend_radius * self.story_defend_radius:
+                self.story_defend_progress += dt
+
+        if self.story_hazard_zones:
+            in_hazard = 0.0
+            for hz in self.story_hazard_zones:
+                rect = hz["rect"]
+                if rect.collidepoint(self.player.pos.x, self.player.pos.y):
+                    in_hazard += float(hz.get("dps", 1.0))
+            if in_hazard > 0:
+                self.story_hazard_accum += in_hazard * dt
+                dmg = int(self.story_hazard_accum)
+                if dmg > 0:
+                    self.story_hazard_accum -= dmg
+                    self.damage_player(dmg)
+
+        if self.player.hp <= 0:
+            self.player.hp = 0
+            self.set_state("gameover")
+            return
+
+        if win_cfg:
+            win_type = win_cfg.get("type")
+            complete = False
+            if win_type == "survive":
+                complete = self.story_elapsed >= float(win_cfg.get("seconds", 0))
+            elif win_type == "kills":
+                complete = self.story_kills >= int(win_cfg.get("count", 0))
+            elif win_type == "defend":
+                complete = self.story_defend_progress >= self.story_defend_required
+            elif win_type == "boss":
+                complete = self.story_boss_spawned and self.story_boss_defeated and not self.boss_alive
+
+            if complete:
+                self.story_level_complete_stats = {
+                    "time": int(self.story_elapsed),
+                    "kills": int(self.story_kills),
+                    "score": int(self.player.score),
+                    "level": int(self.player.level),
+                }
+                self.unlock_next_story_level()
+                self.set_state("story_complete")
 
     # ---------------- Level up screen ----------------
     def open_levelup(self):
@@ -3138,7 +3716,8 @@ class Game:
             sy = y - cam.y
             pygame.draw.line(self.screen, C_GRID, (0, sy), (WIDTH, sy), 1)
 
-        border = pygame.Rect(-cam.x, -cam.y, ARENA_W, ARENA_H)
+        border = pygame.Rect(self.arena_rect.left - cam.x, self.arena_rect.top - cam.y,
+                             self.arena_rect.width, self.arena_rect.height)
         pygame.draw.rect(self.screen, (25, 30, 50), border, 4)
         pygame.draw.rect(self.screen, (70, 245, 210), border, 1)
 
@@ -3148,6 +3727,26 @@ class Game:
             rr = pygame.Rect(r.x - cam.x, r.y - cam.y, r.w, r.h)
             pygame.draw.rect(self.screen, C_WALL, rr, border_radius=10)
             pygame.draw.rect(self.screen, C_WALL_EDGE, rr, 2, border_radius=10)
+
+    def draw_story_objects(self):
+        if self.mode != "story":
+            return
+        cam = self.cam + self.shake_vec
+        if self.story_hazard_zones:
+            for hz in self.story_hazard_zones:
+                rect = hz["rect"]
+                rr = pygame.Rect(rect.x - cam.x, rect.y - cam.y, rect.w, rect.h)
+                overlay = pygame.Surface((rr.w, rr.h), pygame.SRCALPHA)
+                overlay.fill((255, 80, 120, 60))
+                self.screen.blit(overlay, rr.topleft)
+                pygame.draw.rect(self.screen, (255, 120, 160), rr, 2, border_radius=10)
+
+        if self.story_defend_point and self.story_defend_radius > 0:
+            center = (int(self.story_defend_point.x - cam.x), int(self.story_defend_point.y - cam.y))
+            radius = int(self.story_defend_radius)
+            pygame.draw.circle(self.screen, (120, 255, 210, 70), center, radius, 0)
+            pygame.draw.circle(self.screen, C_ACCENT, center, radius, 2)
+            pygame.draw.circle(self.screen, C_ACCENT_2, center, 10, 0)
 
     def draw_pickup_indicators(self, t_seconds: float):
         cam = self.cam + self.shake_vec
@@ -3340,6 +3939,21 @@ class Game:
         draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (sx, sy + 56), C_TEXT)
         draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (sx, sy + 84), C_COIN)
 
+        if self.mode == "story":
+            story_w = 640
+            story_h = 62
+            story_x = WIDTH // 2 - story_w // 2
+            story_y = UI_PAD + 140
+            story_panel = pygame.Rect(story_x, story_y, story_w, story_h)
+            pygame.draw.rect(self.screen, (*C_PANEL, 215), story_panel, border_radius=12)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), story_panel, 2, border_radius=12)
+            level_label = f"STORY LEVEL {self.story_level_index}: {self.story_config.get('name', '') if self.story_config else ''}"
+            obj_label = self.story_objective_progress_text()
+            draw_text(self.screen, self.font_small, level_label, (story_panel.centerx, story_panel.y + 12),
+                      C_ACCENT, center=True, shadow=False)
+            draw_text(self.screen, self.font_small, obj_label, (story_panel.centerx, story_panel.y + 34),
+                      C_TEXT, center=True, shadow=False)
+
         boss = self._get_boss()
         if boss is not None:
             w = 520
@@ -3465,6 +4079,18 @@ class Game:
         o = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         o.fill((0, 0, 0, alpha))
         self.screen.blit(o, (0, 0))
+
+    def draw_story_visibility(self):
+        if self.mode != "story" or not self.story_visibility_radius:
+            return
+        cam = self.cam + self.shake_vec
+        radius = int(self.story_visibility_radius)
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 210))
+        center = (int(self.player.pos.x - cam.x), int(self.player.pos.y - cam.y))
+        pygame.draw.circle(overlay, (0, 0, 0, 0), center, radius)
+        pygame.draw.circle(overlay, (0, 0, 0, 0), center, int(radius * 0.6))
+        self.screen.blit(overlay, (0, 0))
         
     # =========================================================
     # SCREENS
@@ -3511,6 +4137,87 @@ class Game:
 
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
+
+    def draw_story_menu(self, events):
+        self.screen.fill(C_BG)
+        cx = WIDTH // 2
+
+        draw_text(self.screen, self.font_big, "STORY MODE", (cx, 92), C_TEXT, center=True)
+        draw_text(self.screen, self.font_ui, "Complete levels to unlock the next", (cx, 128),
+                  C_TEXT_DIM, center=True, shadow=False)
+
+        box = pygame.Rect(90, 170, WIDTH - 180, HEIGHT - 280)
+        pygame.draw.rect(self.screen, (*C_PANEL, 235), box, border_radius=16)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 220), box, 2, border_radius=16)
+
+        unlocked = self.get_unlocked_story_level()
+        hovered_level = None
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+
+        for idx, btn in enumerate(self.story_level_buttons, start=1):
+            level_cfg = LEVELS[idx - 1]
+            btn.enabled = idx <= unlocked
+            label = f"Level {idx}: {level_cfg['name']}"
+            if not btn.enabled:
+                label = f"Level {idx}: Locked"
+            btn.text = label
+            btn.update(1 / 60, mouse_pos, mouse_down, events)
+            btn.draw(self.screen, self.font_small if btn.enabled else self.font_small)
+            if btn.hover:
+                hovered_level = level_cfg
+
+        info_box = pygame.Rect(box.x + 22, box.bottom - 78, box.w - 44, 58)
+        pygame.draw.rect(self.screen, (*C_PANEL_2, 240), info_box, border_radius=12)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), info_box, 2, border_radius=12)
+        info = hovered_level["objective"] if hovered_level else "Hover a level to preview the objective."
+        draw_text(self.screen, self.font_small, info, (info_box.centerx, info_box.centery),
+                  C_TEXT_DIM if hovered_level is None else C_TEXT, center=True, shadow=False)
+
+        self.story_continue_btn.enabled = unlocked >= 1
+        self.story_continue_btn.update(1 / 60, mouse_pos, mouse_down, events)
+        self.story_continue_btn.draw(self.screen, self.font_med)
+
+        if self.story_back_btn:
+            self.story_back_btn.update(1 / 60, mouse_pos, mouse_down, events)
+            self.story_back_btn.draw(self.screen, self.font_med)
+
+    def draw_story_complete(self, events):
+        self.award_coins_if_needed()
+        self.draw_background()
+        self.draw_obstacles()
+        self.draw_story_objects()
+        self.draw_entities()
+        self.draw_story_visibility()
+        self.draw_hud()
+
+        self.draw_overlay_dim(200)
+        draw_text(self.screen, self.font_big, "LEVEL COMPLETE", (WIDTH // 2, 120), C_OK, center=True)
+
+        stats = self.story_level_complete_stats or {}
+        lines = [
+            f"Level: {self.story_level_index}",
+            f"Score: {stats.get('score', 0)}",
+            f"Kills: {stats.get('kills', 0)}",
+            f"Time: {stats.get('time', 0)}s",
+            f"Coins Earned: +{self.last_run_coins_earned}",
+        ]
+        y = 190
+        for line in lines:
+            draw_text(self.screen, self.font_med, line, (WIDTH // 2, y), C_TEXT, center=True)
+            y += 34
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
+
+        has_next = self.story_level_index < self.story_levels_count()
+        self.story_complete_next_btn.enabled = has_next
+        self.story_complete_next_btn.update(1 / 60, mouse_pos, mouse_down, events)
+        self.story_complete_next_btn.draw(self.screen, self.font_med)
+
+        self.story_complete_menu_btn.update(1 / 60, mouse_pos, mouse_down, events)
+        self.story_complete_menu_btn.draw(self.screen, self.font_med)
 
     def draw_settings(self, events):
         self.screen.fill(C_BG)
@@ -4197,7 +4904,9 @@ class Game:
     def draw_paused(self, events):
         self.draw_background()
         self.draw_obstacles()
+        self.draw_story_objects()
         self.draw_entities()
+        self.draw_story_visibility()
         self.draw_hud()
         self.draw_overlay_dim(175)
         draw_text(self.screen, self.font_big, "PAUSED", (WIDTH // 2, 170), C_TEXT, center=True)
@@ -4211,7 +4920,9 @@ class Game:
     def draw_levelup(self, events):
         self.draw_background()
         self.draw_obstacles()
+        self.draw_story_objects()
         self.draw_entities()
+        self.draw_story_visibility()
         self.draw_hud()
 
         self.draw_overlay_dim(190)
@@ -4246,24 +4957,36 @@ class Game:
                 self.set_state("playing")
 
     def draw_gameover(self, events):
-        self.award_coins_if_needed()
-        self.record_leaderboard_if_needed()
         self.draw_background()
         self.draw_obstacles()
+        self.draw_story_objects()
         self.draw_entities()
+        self.draw_story_visibility()
         self.draw_hud()
 
         self.draw_overlay_dim(205)
-        draw_text(self.screen, self.font_big, "GAME OVER", (WIDTH // 2, 145), C_ACCENT_2, center=True)
+        title = "LEVEL FAILED" if self.mode == "story" else "GAME OVER"
+        title_color = C_WARN if self.mode == "story" else C_ACCENT_2
+        draw_text(self.screen, self.font_big, title, (WIDTH // 2, 145), title_color, center=True)
 
-        stats = [
-            f"Score: {self.player.score}",
-            f"Time: {int(self.survival_time)}s",
-            f"Wave: {self.wave}",
-            f"Level: {self.player.level}",
-            f"Boss Coins Banked: +{self.run_bonus_coins}",
-            f"Coins Earned: +{self.last_run_coins_earned}",
-        ]
+        if self.mode == "story":
+            stats = [
+                f"Level: {self.story_level_index}",
+                f"Score: {self.player.score}",
+                f"Kills: {self.story_kills}",
+                f"Time: {int(self.story_elapsed)}s",
+            ]
+        else:
+            self.award_coins_if_needed()
+            self.record_leaderboard_if_needed()
+            stats = [
+                f"Score: {self.player.score}",
+                f"Time: {int(self.survival_time)}s",
+                f"Wave: {self.wave}",
+                f"Level: {self.player.level}",
+                f"Boss Coins Banked: +{self.run_bonus_coins}",
+                f"Coins Earned: +{self.last_run_coins_earned}",
+            ]
         y = 205
         for s in stats:
             draw_text(self.screen, self.font_med, s, (WIDTH // 2, y), C_TEXT, center=True)
@@ -4271,11 +4994,13 @@ class Game:
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
-        for b in self.gameover_buttons:
+        buttons = self.story_fail_buttons if self.mode == "story" else self.gameover_buttons
+        for b in buttons:
             b.update(1 / 60, mouse_pos, mouse_down, events)
             b.draw(self.screen, self.font_med)
 
-        draw_text(self.screen, self.font_small, "Press R to restart", (WIDTH // 2, HEIGHT - 26), C_TEXT_DIM, center=True, shadow=False)
+        helper_text = "Press R to retry" if self.mode == "story" else "Press R to restart"
+        draw_text(self.screen, self.font_small, helper_text, (WIDTH // 2, HEIGHT - 26), C_TEXT_DIM, center=True, shadow=False)
         
 
     # =========================================================
@@ -4293,7 +5018,9 @@ class Game:
                 self.update_camera(dt)
                 self.draw_background()
                 self.draw_obstacles()
+                self.draw_story_objects()
                 self.draw_entities()
+                self.draw_story_visibility()
                 self.draw_hud()
                 
                 self.draw_boss_tracker()
@@ -4314,6 +5041,9 @@ class Game:
 
             elif self.state == "menu":
                 self.draw_menu(events)
+
+            elif self.state == "story_menu":
+                self.draw_story_menu(events)
 
             elif self.state == "weapons":
                 self.draw_weapons(events)
@@ -4340,6 +5070,10 @@ class Game:
             elif self.state == "levelup":
                 self.update_camera(dt)
                 self.draw_levelup(events)
+
+            elif self.state == "story_complete":
+                self.update_camera(dt)
+                self.draw_story_complete(events)
 
             elif self.state == "gameover":
                 self.update_camera(dt)
