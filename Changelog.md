@@ -177,7 +177,7 @@
 ## v1.6 -- Story Mode Addition
 
 ### New Features
-- Added Story Mode!
+- Added Story Mode! (Story Mode is still under development and is not 100% finished. So expect bugs and UI inconsistencies)
 
 ---
 
@@ -202,5 +202,6 @@
 
 - Remove the cyan overlay in the Leaderboard tab
 - Change 1st, 2nd, and 3rd place numbers to white
+
 
 
