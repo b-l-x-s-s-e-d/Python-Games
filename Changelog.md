@@ -202,16 +202,19 @@
 
 ### New Features
 - Fullscreen mode
-- Story Mode with level-based progression
 - Kill Streak system rewards damage-free play
 - Mini Map displayed in the top-right during gameplay
 
 ### Improvements
 - Redesign the main menu title and weapon/coins panel
-- Move main menu controls into a single centred line
 - Fix bundle UI overlapping page borders
+- Fix Main Menu tabs looking goofy :c
 
 ---
 
 
 ## Urgent Fixes
+- Remove the cyan overlay on the number "1." in the Leaderboard
+- Make ALL numbers (1 - 10) on the Leaderboard white
+- In Story Mode, move the objective bar to the top, but make sure none of the tabs overlay
+- On Level 4 in Story Mode, give the Beacon 5 extra hp and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
