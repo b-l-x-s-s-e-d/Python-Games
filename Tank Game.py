@@ -205,14 +205,14 @@ LEVELS = [
     {
         "id": 2,
         "name": "Lockdown Lanes",
-        "objective": "Eliminate 35 enemies. (Pistol-only)",
-        "win": {"type": "kills", "count": 35},
+        "objective": "Eliminate 25 enemies. (Pistol-only)",
+        "win": {"type": "kills", "count": 25},
         "arena_size": (2000, 1300),
         "obstacles": {"count": 26, "min": (80, 80), "max": (220, 180)},
         "spawn": {"interval": 1.1, "cap": 10},
         "enemy_weights": {"chaser": 0.55, "ranged": 0.25, "sprinter": 0.2},
         "special": {"forced_weapon": "pistol"},
-        "difficulty": 0.35,
+        "difficulty": 0.175,
     },
     {
         "id": 3,
@@ -224,7 +224,7 @@ LEVELS = [
         "spawn": {"interval": 1.05, "cap": 11},
         "enemy_weights": {"chaser": 0.4, "ranged": 0.4, "sprinter": 0.2},
         "special": {"visibility_radius": 260},
-        "difficulty": 0.42,
+        "difficulty": 0.21,
     },
     {
         "id": 4,
@@ -235,8 +235,8 @@ LEVELS = [
         "obstacles": {"count": 20, "min": (90, 70), "max": (200, 150)},
         "spawn": {"interval": 1.05, "cap": 12},
         "enemy_weights": {"chaser": 0.45, "ranged": 0.35, "tank": 0.2},
-        "special": {"objective_point": "center"},
-        "difficulty": 0.5,
+        "special": {"objective_point": "center", "beacon_hp": 20},
+        "difficulty": 0.25,
     },
     {
         "id": 5,
@@ -248,18 +248,17 @@ LEVELS = [
         "spawn": {"interval": 0.95, "cap": 13},
         "enemy_weights": {"chaser": 0.35, "ranged": 0.35, "sprinter": 0.15, "dasher": 0.15},
         "special": {
-            "hazards": [
-                {"rect": (-420, -260, 320, 520), "dps": 1.0},
-                {"rect": (200, -180, 320, 360), "dps": 1.2},
-            ]
+            "hazard_count": 4,
+            "hazard_sizes": [(320, 520), (320, 360)],
+            "hazard_dps": [1.0, 1.2],
         },
-        "difficulty": 0.6,
+        "difficulty": 0.3,
     },
     {
         "id": 6,
         "name": "Overclocked Core",
         "objective": "Defeat the Overlord.",
-        "win": {"type": "boss", "spawn_after": 8},
+        "win": {"type": "boss", "spawn_after": 0},
         "arena_size": (2200, 2200),
         "obstacles": {"count": 10, "min": (120, 90), "max": (220, 180)},
         "spawn": {"interval": 1.4, "cap": 6},
@@ -1104,7 +1103,8 @@ class Chaser(EnemyBase):
         self.score_value = 12
 
     def update(self, dt, game):
-        d = game.player.pos - self.pos
+        target = game.enemy_target_pos()
+        d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
             self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 6.5))
@@ -1121,8 +1121,8 @@ class Ranged(EnemyBase):
 
     def update(self, dt, game):
         self.shoot_cd -= dt
-        player = game.player
-        d = player.pos - self.pos
+        target = game.enemy_target_pos()
+        d = target - self.pos
         dist = d.length()
 
         # keep distance
@@ -1142,7 +1142,7 @@ class Ranged(EnemyBase):
 
         if self.shoot_cd <= 0 and dist <= RANGED_MAX_SHOOT_DIST:
             if game.is_world_pos_onscreen(self.pos, margin=RANGED_SHOOT_IF_ONSCREEN_MARGIN):
-                if (not RANGED_LOS_ENABLED) or game.has_line_of_sight(self.pos, player.pos):
+                if (not RANGED_LOS_ENABLED) or game.has_line_of_sight(self.pos, target):
                     if dist > 1:
                         dirn = d.normalize()
                         spd = RANGED_BULLET_SPEED_BASE + 60.0 * game.diff_eased
@@ -1169,7 +1169,8 @@ class Tank(EnemyBase):
         self.score_value = 24
 
     def update(self, dt, game):
-        d = game.player.pos - self.pos
+        target = game.enemy_target_pos()
+        d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
             self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 4.0))
@@ -1184,7 +1185,8 @@ class Sprinter(EnemyBase):
         self.score_value = 10
 
     def update(self, dt, game):
-        d = game.player.pos - self.pos
+        target = game.enemy_target_pos()
+        d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
             self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 9.0))
@@ -1204,7 +1206,8 @@ class Dasher(EnemyBase):
         self.dash_cd -= dt
         self.dash_time = max(0.0, self.dash_time - dt)
 
-        d = game.player.pos - self.pos
+        target = game.enemy_target_pos()
+        d = target - self.pos
         dist2 = d.length_squared()
 
         if self.dash_time > 0:
@@ -1245,6 +1248,14 @@ class Boss(EnemyBase):
         self.bullet_damage = 1 + max(0, (wave_index // 10) - 1) * 2 # Boss damage
         self.bullet_life = 1.5
         self.enraged = False
+        # Story boss specials (Level 6 only).
+        self.dash_cd = random.uniform(4.0, 6.0)
+        self.dash_windup = 0.0
+        self.dash_timer = 0.0
+        self.dash_dir = Vector2(0, 0)
+        self.dash_target = Vector2(self.pos)
+        self.dash_hit = False
+        self.rocket_cd = random.uniform(5.0, 7.0)
 
     def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float, weapon_id: Optional[str] = None, from_player: bool = False):
         # Boss has knockback resistance
@@ -1258,6 +1269,45 @@ class Boss(EnemyBase):
             self.volley = 4
 
         self.shoot_cd -= dt
+
+        if game.boss_specials_active():
+            # Dash attack: short windup, then lunge toward the player.
+            self.dash_cd -= dt
+            if self.dash_windup > 0:
+                self.dash_windup -= dt
+                self.pos += self.vel * dt
+                game.resolve_circle_walls(self, damping=0.12)
+                if self.dash_windup <= 0:
+                    self.dash_timer = 0.25
+                    self.dash_hit = False
+            elif self.dash_timer > 0:
+                dash_speed = 920.0
+                self.pos += self.dash_dir * dash_speed * dt
+                game.resolve_circle_walls(self, damping=0.12)
+                if not self.dash_hit:
+                    rr = (self.radius + PLAYER_RADIUS) ** 2
+                    if (game.player.pos - self.pos).length_squared() <= rr:
+                        self.dash_hit = True
+                        game.damage_player(2)
+                        knock = (game.player.pos - self.pos)
+                        if knock.length_squared() > 0.001:
+                            game.player.vel += knock.normalize() * 420
+                self.dash_timer -= dt
+            elif self.dash_cd <= 0:
+                self.dash_cd = random.uniform(4.0, 6.0)
+                self.dash_windup = 0.35
+                d = game.player.pos - self.pos
+                self.dash_dir = d.normalize() if d.length_squared() > 0.001 else Vector2(1, 0)
+                self.dash_target = Vector2(game.player.pos)
+
+            # Rocket strike: mark ground, then drop and explode.
+            self.rocket_cd -= dt
+            if self.rocket_cd <= 0:
+                self.rocket_cd = random.uniform(5.0, 7.0)
+                jitter = Vector2(random.uniform(-120, 120), random.uniform(-120, 120))
+                game.spawn_boss_rocket_strike(game.player.pos + jitter)
+            if self.dash_windup > 0 or self.dash_timer > 0:
+                return
 
         # Slow pursuit
         d = game.player.pos - self.pos
@@ -1308,6 +1358,11 @@ class Boss(EnemyBase):
         pygame.draw.circle(surf, col, p, self.radius)
         circle_outline(surf, C_BOSS_EDGE, p, self.radius + 5, 3)
         circle_outline(surf, (25, 25, 35), p, self.radius + 10, 2)
+        if self.dash_windup > 0:
+            # Telegraph the dash with a line toward the target.
+            t = (int(self.dash_target.x - cam.x), int(self.dash_target.y - cam.y))
+            pygame.draw.line(surf, (255, 150, 110), p, t, 3)
+            circle_outline(surf, (255, 180, 140), p, self.radius + 14, 2)
 
         # tiny hp bar over head
         w = self.radius * 2 + 30
@@ -1798,6 +1853,12 @@ class Game:
         self.story_hazard_accum = 0.0
         self.story_level_complete_stats: Dict[str, int] = {}
         self.story_forced_weapon: Optional[str] = None
+        self.story_beacon_pos: Optional[Vector2] = None
+        self.story_beacon_hp: Optional[int] = None
+        self.story_beacon_max: int = 0
+        self.story_beacon_radius: int = 18
+        self.story_beacon_iframes = 0.0
+        self.boss_rocket_strikes: List[Dict[str, object]] = []
 
         self.arena_rect = pygame.Rect(0, 0, ARENA_W, ARENA_H)
 
@@ -2252,6 +2313,12 @@ class Game:
         self.story_visibility_radius = config.get("special", {}).get("visibility_radius")
         self.story_hazard_zones = []
         self.story_hazard_accum = 0.0
+        self.story_beacon_pos = None
+        self.story_beacon_hp = None
+        self.story_beacon_max = 0
+        self.story_beacon_radius = int(config.get("special", {}).get("beacon_radius", 18))
+        self.story_beacon_iframes = 0.0
+        self.boss_rocket_strikes = []
 
         objective_point = config.get("special", {}).get("objective_point")
         if objective_point == "center":
@@ -2259,18 +2326,37 @@ class Game:
         else:
             self.story_defend_point = None
 
-        hazards = config.get("special", {}).get("hazards", [])
-        if hazards:
-            center = Vector2(self.arena_rect.centerx, self.arena_rect.centery)
-            for hz in hazards:
-                rect = hz.get("rect", (0, 0, 100, 100))
-                rect_abs = pygame.Rect(
-                    int(center.x + rect[0]),
-                    int(center.y + rect[1]),
-                    int(rect[2]),
-                    int(rect[3]),
-                )
-                self.story_hazard_zones.append({"rect": rect_abs, "dps": float(hz.get("dps", 1.0))})
+        beacon_hp = config.get("special", {}).get("beacon_hp")
+        if beacon_hp and self.story_defend_point:
+            # Story level beacon: enemies target this instead of the player.
+            self.story_beacon_pos = Vector2(self.story_defend_point)
+            self.story_beacon_hp = int(beacon_hp)
+            self.story_beacon_max = int(beacon_hp)
+
+        hazard_count = int(config.get("special", {}).get("hazard_count", 0))
+        hazard_sizes = list(config.get("special", {}).get("hazard_sizes", []))
+        hazard_dps = list(config.get("special", {}).get("hazard_dps", []))
+        if hazard_count > 0 and hazard_sizes:
+            # Randomize hazard zones each Level 5 start; avoid obstacles/overlap.
+            max_attempts = 80
+            for _ in range(hazard_count):
+                size = random.choice(hazard_sizes)
+                w, h = int(size[0]), int(size[1])
+                placed = False
+                for _ in range(max_attempts):
+                    x = random.randint(self.arena_rect.left, self.arena_rect.right - w)
+                    y = random.randint(self.arena_rect.top, self.arena_rect.bottom - h)
+                    rect_abs = pygame.Rect(x, y, w, h)
+                    if any(rect_abs.colliderect(obs) for obs in self.obstacles):
+                        continue
+                    if any(rect_abs.colliderect(hz["rect"]) for hz in self.story_hazard_zones):
+                        continue
+                    dps = float(random.choice(hazard_dps)) if hazard_dps else 1.0
+                    self.story_hazard_zones.append({"rect": rect_abs, "dps": dps})
+                    placed = True
+                    break
+                if not placed:
+                    break
 
         self.save.story_last_level = level_index
         self.save.save()
@@ -2302,6 +2388,81 @@ class Game:
         if win_type == "boss":
             return self.story_objective_text
         return self.story_objective_text
+
+    def beacon_active(self) -> bool:
+        return self.mode == "story" and self.story_beacon_pos is not None and self.story_beacon_hp is not None
+
+    def enemy_target_pos(self) -> Vector2:
+        if self.beacon_active():
+            return Vector2(self.story_beacon_pos)
+        return Vector2(self.player.pos)
+
+    def boss_specials_active(self) -> bool:
+        return self.mode == "story" and self.story_level_index == 6
+
+    def damage_beacon(self, amount: int):
+        if not self.beacon_active():
+            return
+        if self.story_beacon_iframes > 0:
+            return
+        self.story_beacon_hp = max(0, int(self.story_beacon_hp) - int(amount))
+        self.story_beacon_iframes = 0.55  # brief grace so it doesn't melt instantly
+
+    def spawn_boss_rocket_strike(self, pos: Vector2):
+        # Boss special: telegraphed rocket strike.
+        self.boss_rocket_strikes.append({
+            "pos": Vector2(pos),
+            "state": "telegraph",
+            "timer": 0.7,
+            "radius": 90,
+        })
+
+    def update_boss_rocket_strikes(self, dt: float):
+        if not self.boss_rocket_strikes:
+            return
+        for strike in list(self.boss_rocket_strikes):
+            strike["timer"] -= dt
+            if strike["state"] == "telegraph" and strike["timer"] <= 0:
+                strike["state"] = "fall"
+                strike["timer"] = 0.35
+            elif strike["state"] == "fall" and strike["timer"] <= 0:
+                strike["state"] = "explode"
+                strike["timer"] = 0.22
+                # Apply damage once on explosion.
+                d2 = (self.player.pos - strike["pos"]).length_squared()
+                rad = float(strike["radius"])
+                if d2 <= rad * rad:
+                    self.damage_player(2)
+                    knock = (self.player.pos - strike["pos"])
+                    if knock.length_squared() > 0.001:
+                        self.player.vel += knock.normalize() * 360
+            elif strike["state"] == "explode" and strike["timer"] <= 0:
+                self.boss_rocket_strikes.remove(strike)
+
+    def draw_boss_rocket_strikes(self):
+        if not self.boss_rocket_strikes:
+            return
+        cam = self.cam + self.shake_vec
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        for strike in self.boss_rocket_strikes:
+            pos = strike["pos"]
+            screen = (int(pos.x - cam.x), int(pos.y - cam.y))
+            radius = int(strike["radius"])
+            if strike["state"] == "telegraph":
+                pygame.draw.circle(overlay, (255, 90, 110, 70), screen, radius, 0)
+                pygame.draw.circle(overlay, (255, 120, 140, 170), screen, radius, 2)
+            elif strike["state"] == "fall":
+                top = (screen[0], screen[1] - 120)
+                pygame.draw.line(overlay, (255, 130, 150, 200), top, screen, 4)
+                pygame.draw.polygon(overlay, (255, 130, 150, 220),
+                                    [(screen[0] - 10, screen[1] - 10),
+                                     (screen[0] + 10, screen[1] - 10),
+                                     (screen[0], screen[1] + 12)])
+                pygame.draw.circle(overlay, (255, 120, 140, 180), screen, radius, 2)
+            else:
+                pygame.draw.circle(overlay, (255, 120, 140, 140), screen, radius, 0)
+                pygame.draw.circle(overlay, (255, 160, 180, 220), screen, radius, 2)
+        self.screen.blit(overlay, (0, 0))
 
     # ---------------- Cosmetics ----------------
     def get_cosmetic(self, cosmetic_id: str) -> Optional[CosmeticDef]:
@@ -2717,6 +2878,11 @@ class Game:
         self.story_hazard_zones = []
         self.story_defend_point = None
         self.story_forced_weapon = None
+        self.story_beacon_pos = None
+        self.story_beacon_hp = None
+        self.story_beacon_max = 0
+        self.story_beacon_iframes = 0.0
+        self.boss_rocket_strikes = []
 
         # Always ensure weapon keys are synced before starting
         self.save.ensure_weapons(list(WEAPONS.keys()))
@@ -3365,11 +3531,13 @@ class Game:
         self.refresh_challenges()
         self.story_elapsed = time.time() - self.story_start_time
         self.survival_time = self.story_elapsed
+        self.story_beacon_iframes = max(0.0, self.story_beacon_iframes - dt)
 
         self.boss_grace_timer = max(0.0, self.boss_grace_timer - dt)
         self.boss_banner_timer = max(0.0, self.boss_banner_timer - dt)
 
         self.try_spawn_powerup(dt)
+        self.update_boss_rocket_strikes(dt)
 
         spawn_cfg = self.story_config.get("spawn", {}) if self.story_config else {}
         self.spawn_interval = float(spawn_cfg.get("interval", SPAWN_RATE_BASE))
@@ -3468,8 +3636,12 @@ class Game:
             self.resolve_enemy_player_overlap(e)
 
         self._handle_bullet_enemy_collisions()
-        self._handle_enemy_bullet_player_collisions()
-        self._handle_enemy_contact_player()
+        if self.beacon_active():
+            self._handle_enemy_bullet_beacon_collisions()
+            self._handle_enemy_contact_beacon()
+        else:
+            self._handle_enemy_bullet_player_collisions()
+            self._handle_enemy_contact_player()
 
         alive = []
         for e in self.enemies:
@@ -3529,6 +3701,9 @@ class Game:
 
         if self.player.hp <= 0:
             self.player.hp = 0
+            self.set_state("gameover")
+            return
+        if self.beacon_active() and self.story_beacon_hp is not None and self.story_beacon_hp <= 0:
             self.set_state("gameover")
             return
 
@@ -3669,6 +3844,16 @@ class Game:
                 self.damage_player(b.damage)
                 break
 
+    def _handle_enemy_bullet_beacon_collisions(self):
+        if not self.beacon_active():
+            return
+        for b in list(self.enemy_projectiles):
+            rr = (self.story_beacon_radius + b.radius) ** 2
+            if (self.story_beacon_pos - b.pos).length_squared() <= rr:
+                b.life = 0
+                self.damage_beacon(b.damage)
+                break
+
     def _handle_enemy_contact_player(self):
         if self.player.invulnerable():
             return
@@ -3679,6 +3864,15 @@ class Game:
                 d = (self.player.pos - e.pos)
                 if d.length_squared() > 0.001:
                     self.player.vel += d.normalize() * 220
+                break
+
+    def _handle_enemy_contact_beacon(self):
+        if not self.beacon_active():
+            return
+        for e in self.enemies:
+            rr = (self.story_beacon_radius + e.radius) ** 2
+            if (self.story_beacon_pos - e.pos).length_squared() <= rr:
+                self.damage_beacon(e.damage_contact)
                 break
 
     def damage_player(self, amount: int):
@@ -3747,6 +3941,20 @@ class Game:
             pygame.draw.circle(self.screen, (120, 255, 210, 70), center, radius, 0)
             pygame.draw.circle(self.screen, C_ACCENT, center, radius, 2)
             pygame.draw.circle(self.screen, C_ACCENT_2, center, 10, 0)
+            if self.beacon_active():
+                # Beacon icon + HP bar for Level 4 defense.
+                beacon_center = (int(self.story_beacon_pos.x - cam.x), int(self.story_beacon_pos.y - cam.y))
+                pygame.draw.circle(self.screen, (255, 220, 140), beacon_center, self.story_beacon_radius)
+                circle_outline(self.screen, (120, 80, 40), beacon_center, self.story_beacon_radius + 4, 2)
+                bar_w = 80
+                bar_h = 8
+                bar_x = beacon_center[0] - bar_w // 2
+                bar_y = beacon_center[1] - self.story_beacon_radius - 18
+                frac = clamp(self.story_beacon_hp / max(1, self.story_beacon_max), 0, 1)
+                pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bar_x, bar_y, bar_w, bar_h))
+                pygame.draw.rect(self.screen, (255, 120, 140), pygame.Rect(bar_x, bar_y, int(bar_w * frac), bar_h))
+
+        self.draw_boss_rocket_strikes()
 
     def draw_pickup_indicators(self, t_seconds: float):
         cam = self.cam + self.shake_vec
@@ -3867,8 +4075,17 @@ class Game:
         for b in self.enemy_projectiles:
             b.draw(self.screen, cam)
 
-        for e in self.enemies:
-            e.draw(self.screen, cam)
+        visibility_radius = self.story_visibility_radius if self.mode == "story" else None
+        if visibility_radius:
+            # Level 3: hide enemies completely outside the vision circle.
+            rad2 = visibility_radius * visibility_radius
+            for e in self.enemies:
+                if (e.pos - self.player.pos).length_squared() > rad2:
+                    continue
+                e.draw(self.screen, cam)
+        else:
+            for e in self.enemies:
+                e.draw(self.screen, cam)
 
         for ft in self.float_texts:
             ft.draw(self.screen, cam, self.font_small)
@@ -4086,7 +4303,7 @@ class Game:
         cam = self.cam + self.shake_vec
         radius = int(self.story_visibility_radius)
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 210))
+        overlay.fill((0, 0, 0, 255))
         center = (int(self.player.pos.x - cam.x), int(self.player.pos.y - cam.y))
         pygame.draw.circle(overlay, (0, 0, 0, 0), center, radius)
         pygame.draw.circle(overlay, (0, 0, 0, 0), center, int(radius * 0.6))
@@ -4329,8 +4546,6 @@ class Game:
             for idx, entry in enumerate(entries, start=1):
                 row = pygame.Rect(box.x + 10, row_y, box.w - 20, row_h)
                 row_color = (*C_PANEL_2, 220) if idx % 2 == 0 else (*C_PANEL_2, 180)
-                if idx == 1:
-                    row_color = (*C_ACCENT, 60)
                 pygame.draw.rect(self.screen, row_color, row, border_radius=10)
                 pygame.draw.rect(self.screen, (*C_WALL_EDGE, 150), row, 1, border_radius=10)
 
@@ -4338,7 +4553,8 @@ class Game:
                 badge_color = (*C_ACCENT, 220) if idx == 1 else (*C_PANEL, 220)
                 pygame.draw.rect(self.screen, badge_color, badge, border_radius=8)
                 pygame.draw.rect(self.screen, (*C_WALL_EDGE, 190), badge, 2, border_radius=8)
-                rect_centered_text(self.screen, self.font_small, f"{idx}", badge, (10, 20, 20), shadow=False)
+                rank_color = (255, 255, 255) if idx <= 3 else (10, 20, 20)
+                rect_centered_text(self.screen, self.font_small, f"{idx}", badge, rank_color, shadow=False)
 
                 draw_text(self.screen, self.font_ui, f"{entry['score']}", (col_score, row.y + 12), C_TEXT, shadow=False)
                 draw_text(self.screen, self.font_ui, f"{entry['time']}s", (col_time, row.y + 12), C_TEXT, shadow=False)
