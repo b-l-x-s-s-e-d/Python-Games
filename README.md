@@ -4,6 +4,17 @@
 
 To run the Tank Game correctly and ensure your progress saves, you **must clone or download the entire repository**. Downloading individual files may cause issues with saving or other features.
 
+---
+
+## Download All Requirements
+
+1. Press: `🪟 + R`
+2. Type: `CMD`
+3. Run this command to download requirements: `pip install pygame`
+4. Wait until all requirements are successfully downloaded
+
+---
+
 ## Installation
 
 1. **Clone or download the full repository**
@@ -22,10 +33,14 @@ To run the Tank Game correctly and ensure your progress saves, you **must clone 
    - Open `Tank Game.py`.
    - Any progress you make will automatically update `save.json`.
 
+---
+
 ## Saving Progress
 
 - All progress (stats, unlocks, upgrades, etc.) is stored in `save.json`.
 - As long as the file remains in the repository folder, your progress will save between runs.
+
+---
 
 ## ⚠️ Editing save.json
 
