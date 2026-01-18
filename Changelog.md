@@ -174,6 +174,13 @@
 
 ---
 
+## v1.6 -- Story Mode Addition
+
+### New Features
+- Added Story Mode!
+
+---
+
 
 ## To-Do Features
 
@@ -195,4 +202,5 @@
 
 - Remove the cyan overlay in the Leaderboard tab
 - Change 1st, 2nd, and 3rd place numbers to white
+
 
