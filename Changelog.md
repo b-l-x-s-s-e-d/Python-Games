@@ -159,11 +159,12 @@
 
 ### New Features
 - Added a Mini Map to the top-right gameplay HUD, showing the whole map with player, enemies, and obstacles
+- Added a "Daily Wheel" that can be spun daily and gives the player a chance to obtain a limited Tank (BETA)
 
 ### Improvements
-- Moved the Story Mode objective bar to the top of the screen so it no longer obstructs gameplay
+- Moved the Story Mode objective bar to the top of the screen so it no longer obstructs gameplay (BETA)
 - Adjusted the Bundles tab layout so that all bundles fit within the page
-- Replaced the player's HP display with the Beacon's HP display on Level 4 of Story Mode
+- Replaced the player's HP display with a bar representing the Beacon's HP (BETA)
 
 ### Gameplay
 - Increased Beacon's max HP by 5 in Level 4 of Story Mode
@@ -180,21 +181,17 @@
 ### New Features
 - Fullscreen mode
 - Kill Streak system rewards damage-free play
-- Mini Map displayed in the top-right during gameplay
 
 ### Improvements
 - Redesign the main menu title and weapon/coins panel
-- Fix bundle UI overlapping page borders
 - Fix Main Menu tabs looking goofy :c
 
 ---
 
 
 ## Urgent Fixes
-- Remove the cyan overlay on the number "1." in the Leaderboard
-- Make ALL numbers (1 - 10) on the Leaderboard white
-- In Story Mode, move the objective bar to the top, but make sure none of the tabs overlay
-- On Level 4 in Story Mode, give the Beacon 5 extra HP and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
+- Fix BETA designs
+
 
 
 
