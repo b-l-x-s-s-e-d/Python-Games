@@ -44,30 +44,6 @@ COINS_PER_WAVE = 4
 ARENA_W, ARENA_H = 3000, 3000
 BG_GRID_SIZE = 90
 
-DAILY_WHEEL_COOLDOWN = 24 * 60 * 60
-DAILY_WHEEL_FALLBACK_TANK_COINS = 100
-DAILY_WHEEL_FALLBACK_META_COINS = 50
-DAILY_WHEEL_FALLBACK_WINDSCREEN_COINS = 150
-DAILY_WHEEL_REWARDS = [
-    {"id": "coins_50", "label": "50 COINS", "short": "50", "weight": 18, "kind": "coins", "amount": 50},
-    {"id": "coins_100", "label": "100 COINS", "short": "100", "weight": 14, "kind": "coins", "amount": 100},
-    {"id": "coins_20", "label": "20 COINS", "short": "20", "weight": 20, "kind": "coins", "amount": 20},
-    {"id": "random_tank", "label": "RANDOM TANK", "short": "TANK", "weight": 10, "kind": "tank"},
-    {"id": "coins_10", "label": "10 COINS", "short": "10", "weight": 22, "kind": "coins", "amount": 10},
-    {"id": "random_meta", "label": "META UPGRADE", "short": "META", "weight": 10, "kind": "meta"},
-    {"id": "windscreen", "label": "WINDSCREEN WIPER", "short": "WIPER", "weight": 1, "kind": "windscreen"},
-    {"id": "coins_300", "label": "300 COINS", "short": "300", "weight": 5, "kind": "coins", "amount": 300},
-]
-DAILY_WHEEL_META_UPGRADES = [
-    {"id": "meta_damage", "name": "Damage +5%", "max": 10},
-    {"id": "meta_move", "name": "Move Speed +5%", "max": 10},
-    {"id": "meta_hp", "name": "Max HP +1", "max": 5},
-    {"id": "meta_xp", "name": "XP Gain +5%", "max": 10},
-    {"id": "meta_dash", "name": "Dash Cooldown -5%", "max": 10},
-    {"id": "meta_armor", "name": "Damage Resistance +10%", "max": 10},
-    {"id": "meta_bulletspeed", "name": "Bullet Speed +5%", "max": 10},
-]
-
 OBSTACLE_COUNT = 22
 OBSTACLE_MIN = (80, 60)
 OBSTACLE_MAX = (220, 180)
@@ -418,7 +394,6 @@ class SaveManager:
         self.leaderboard: List[Dict[str, int]] = []
         self.story_unlocked_level: int = 1
         self.story_last_level: int = 1
-        self.last_spin_timestamp: int = 0
         self.load()
 
     def defaults(self):
@@ -446,7 +421,6 @@ class SaveManager:
         self.leaderboard = []
         self.story_unlocked_level = 1
         self.story_last_level = 1
-        self.last_spin_timestamp = 0
 
     def ensure_weapons(self, weapon_ids: List[str]) -> bool:
         """Future-proof: ensure save file contains keys for every weapon in WEAPONS."""
@@ -567,7 +541,6 @@ class SaveManager:
             self.leaderboard = list(data.get("leaderboard", []))
             self.story_unlocked_level = int(data.get("story_unlocked_level", 1))
             self.story_last_level = int(data.get("story_last_level", self.story_unlocked_level))
-            self.last_spin_timestamp = int(data.get("last_spin_timestamp", 0))
 
             for k in ["meta_damage", "meta_move", "meta_hp", "meta_xp", "meta_dash", "meta_armor", "meta_bulletspeed"]:
                 if k not in self.shop_levels:
@@ -585,8 +558,6 @@ class SaveManager:
             max_story = max(1, len(LEVELS))
             if self.story_unlocked_level > max_story:
                 self.story_unlocked_level = max_story
-            if self.last_spin_timestamp < 0:
-                self.last_spin_timestamp = 0
             if self.story_last_level > max_story:
                 self.story_last_level = self.story_unlocked_level
 
@@ -640,7 +611,6 @@ class SaveManager:
                 "leaderboard": self.leaderboard,
                 "story_unlocked_level": int(self.story_unlocked_level),
                 "story_last_level": int(self.story_last_level),
-                "last_spin_timestamp": int(self.last_spin_timestamp),
             }
             with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -1859,7 +1829,7 @@ class Game:
         self._init_audio()
 
         # State
-        self.state = "menu"  # menu, daily_wheel, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
+        self.state = "menu"  # menu, weapons, shop, settings, controls, leaderboard, challenges, playing, paused, levelup, gameover
         self.running = True
 
         # Mode
@@ -1937,7 +1907,6 @@ class Game:
         # UI
         self.menu_buttons: List[Button] = []
         self.menu_challenges_btn: Optional[Button] = None
-        self.menu_daily_wheel_btn: Optional[Button] = None
         self.shop_back_btn: Optional[Button] = None
         self.weapon_back_btn: Optional[Button] = None
         self.leaderboard_back_btn: Optional[Button] = None
@@ -1949,8 +1918,6 @@ class Game:
         self.story_complete_next_btn: Optional[Button] = None
         self.story_complete_menu_btn: Optional[Button] = None
         self.story_fail_buttons: List[Button] = []
-        self.daily_wheel_back_btn: Optional[Button] = None
-        self.daily_wheel_spin_btn: Optional[Button] = None
         self.challenges_view = "daily"
         self.challenge_tabs: List[TabButton] = []
         self.pause_buttons: List[Button] = []
@@ -2099,14 +2066,6 @@ class Game:
             "Challenges",
             lambda: self.set_state("challenges")
         )
-        wheel_size = 72
-        wheel_x = WIDTH - wheel_size - 30
-        wheel_y = top + gap * 1 - 6
-        self.menu_daily_wheel_btn = Button(
-            pygame.Rect(wheel_x, wheel_y, wheel_size, wheel_size),
-            "",
-            self.open_daily_wheel
-        )
 
         self.weapon_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.shop_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
@@ -2115,8 +2074,6 @@ class Game:
         self.challenges_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.story_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
         self.story_continue_btn = Button(pygame.Rect(WIDTH - 260, HEIGHT - 80, 220, 52), "Continue", self.start_story_continue)
-        self.daily_wheel_back_btn = Button(pygame.Rect(40, HEIGHT - 80, 220, 52), "Back", lambda: self.set_state("menu"))
-        self.daily_wheel_spin_btn = Button(pygame.Rect(WIDTH // 2 - 120, HEIGHT - 140, 240, 56), "Spin", self.spin_daily_wheel)
 
         self.story_level_buttons = []
         story_cols = 2
@@ -2272,11 +2229,6 @@ class Game:
         self.challenges_view = "daily"
         self.set_state("challenges")
 
-    def open_daily_wheel(self):
-        self.daily_wheel_message = ""
-        self.daily_wheel_message_timer = 0.0
-        self.set_state("daily_wheel")
-
     # ---------------- Story Mode ----------------
     def open_story_menu(self):
         self.set_state("story_menu")
@@ -2358,16 +2310,6 @@ class Game:
         self.coins_awarded_this_gameover = False
         self.run_bonus_coins = 0
         self.leaderboard_recorded = False
-
-        self.daily_wheel_angle = 0.0
-        self.daily_wheel_spinning = False
-        self.daily_wheel_spin_time = 0.0
-        self.daily_wheel_spin_duration = 0.0
-        self.daily_wheel_spin_start = 0.0
-        self.daily_wheel_spin_delta = 0.0
-        self.daily_wheel_selected_reward: Optional[Dict[str, object]] = None
-        self.daily_wheel_message = ""
-        self.daily_wheel_message_timer = 0.0
 
         self.in_boss_fight = False
         self.boss_alive = False
@@ -2902,113 +2844,6 @@ class Game:
         self.save.save()
         self.audio_play("buy")
 
-    # ---------------- Daily Wheel ----------------
-    def daily_wheel_remaining(self) -> float:
-        now = time.time()
-        last_spin = float(self.save.last_spin_timestamp or 0)
-        return max(0.0, (last_spin + DAILY_WHEEL_COOLDOWN) - now)
-
-    def daily_wheel_available(self) -> bool:
-        return self.daily_wheel_remaining() <= 0.0
-
-    def format_cooldown(self, seconds: float) -> str:
-        seconds = max(0, int(seconds))
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        secs = seconds % 60
-        if hours > 0:
-            return f"{hours}h {minutes}m"
-        if minutes > 0:
-            return f"{minutes}m {secs}s"
-        return f"{secs}s"
-
-    def pick_daily_wheel_reward(self) -> Dict[str, object]:
-        total = sum(entry["weight"] for entry in DAILY_WHEEL_REWARDS)
-        roll = random.uniform(0, total)
-        acc = 0.0
-        for entry in DAILY_WHEEL_REWARDS:
-            acc += entry["weight"]
-            if roll <= acc:
-                return entry
-        return DAILY_WHEEL_REWARDS[-1]
-
-    def spin_daily_wheel(self):
-        if self.daily_wheel_spinning or not self.daily_wheel_available():
-            return
-        reward = self.pick_daily_wheel_reward()
-        self.daily_wheel_selected_reward = reward
-        slice_angle = math.tau / len(DAILY_WHEEL_REWARDS)
-        reward_index = DAILY_WHEEL_REWARDS.index(reward)
-        slice_center = reward_index * slice_angle + slice_angle / 2
-        desired = -math.pi / 2 - slice_center
-        start = self.daily_wheel_angle
-        delta = (desired - start) % (math.tau)
-        delta += math.tau * random.randint(3, 5)
-        self.daily_wheel_spin_start = start
-        self.daily_wheel_spin_delta = delta
-        self.daily_wheel_spin_time = 0.0
-        self.daily_wheel_spin_duration = 3.2
-        self.daily_wheel_spinning = True
-        self.daily_wheel_message = ""
-        self.daily_wheel_message_timer = 0.0
-
-    def apply_daily_wheel_reward(self, reward: Dict[str, object]):
-        message = ""
-        kind = reward.get("kind")
-        if kind == "coins":
-            amount = int(reward.get("amount", 0))
-            self.save.coins += amount
-            message = f"+{amount} COINS"
-        elif kind == "tank":
-            available = [wid for wid in WEAPONS.keys() if not self.save.weapon_unlocks.get(wid, False)]
-            if available:
-                wid = random.choice(available)
-                self.save.weapon_unlocks[wid] = True
-                message = f"Unlocked: {WEAPONS[wid].name}"
-            else:
-                self.save.coins += DAILY_WHEEL_FALLBACK_TANK_COINS
-                message = f"All tanks owned → +{DAILY_WHEEL_FALLBACK_TANK_COINS} COINS"
-        elif kind == "windscreen":
-            wid = "windscreen"
-            if not self.save.weapon_unlocks.get(wid, False):
-                self.save.weapon_unlocks[wid] = True
-                message = f"Unlocked: {WEAPONS[wid].name}"
-            else:
-                self.save.coins += DAILY_WHEEL_FALLBACK_WINDSCREEN_COINS
-                message = f"Windscreen owned → +{DAILY_WHEEL_FALLBACK_WINDSCREEN_COINS} COINS"
-        elif kind == "meta":
-            candidates = [
-                entry for entry in DAILY_WHEEL_META_UPGRADES
-                if int(self.save.shop_levels.get(entry["id"], 0)) < int(entry["max"])
-            ]
-            if candidates:
-                picked = random.choice(candidates)
-                self.save.shop_levels[picked["id"]] = int(self.save.shop_levels.get(picked["id"], 0)) + 1
-                message = f"Meta Upgrade: {picked['name']}"
-            else:
-                self.save.coins += DAILY_WHEEL_FALLBACK_META_COINS
-                message = f"Meta maxed → +{DAILY_WHEEL_FALLBACK_META_COINS} COINS"
-        self.save.ensure_weapons(list(WEAPONS.keys()))
-        self.save.last_spin_timestamp = int(time.time())
-        self.save.save()
-        self.audio_play("levelup")
-        self.daily_wheel_message = message
-        self.daily_wheel_message_timer = 3.6
-
-    def update_daily_wheel(self, dt: float):
-        if self.daily_wheel_spinning:
-            self.daily_wheel_spin_time += dt
-            t = min(1.0, self.daily_wheel_spin_time / max(0.001, self.daily_wheel_spin_duration))
-            eased = 1 - (1 - t) ** 3
-            self.daily_wheel_angle = self.daily_wheel_spin_start + self.daily_wheel_spin_delta * eased
-            if t >= 1.0:
-                self.daily_wheel_spinning = False
-                if self.daily_wheel_selected_reward:
-                    self.apply_daily_wheel_reward(self.daily_wheel_selected_reward)
-                self.daily_wheel_selected_reward = None
-        if self.daily_wheel_message_timer > 0:
-            self.daily_wheel_message_timer = max(0.0, self.daily_wheel_message_timer - dt)
-
     # ---------------- Weapons screen ----------------
     def open_weapons_screen(self):
         # Ensure weapons list is always synced before showing (future updates safety)
@@ -3491,7 +3326,7 @@ class Game:
                 self.running = False
 
             if e.type == pygame.KEYDOWN:
-                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges", "story_menu", "story_complete", "daily_wheel"):
+                if self.state in ("controls", "weapons", "shop", "settings", "leaderboard", "challenges", "story_menu", "story_complete"):
                     if e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                         self.set_state("menu")
 
@@ -4390,17 +4225,8 @@ class Game:
         draw_text(self.screen, self.font_ui, f"Score: {self.player.score}", (text_x, text_y), C_TEXT)
         draw_text(self.screen, self.font_ui, f"Wave: {self.wave}", (text_x, text_y + 28), C_TEXT)
         if self.mode == "story" and self.story_level_index == 4 and self.beacon_active():
-            draw_text(self.screen, self.font_ui, "BEACON", (text_x, text_y + 52), C_TEXT)
-            bar_w = 150
-            bar_h = 10
-            bx = text_x + 92
-            by = text_y + 56
-            pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bx, by, bar_w, bar_h), border_radius=6)
-            frac = clamp(self.story_beacon_hp / max(1, self.story_beacon_max), 0, 1)
-            pygame.draw.rect(self.screen, (255, 180, 120), pygame.Rect(bx, by, int(bar_w * frac), bar_h), border_radius=6)
-            pygame.draw.rect(self.screen, (255, 200, 150), pygame.Rect(bx, by, bar_w, bar_h), 2, border_radius=6)
-            beacon_value = f"{int(self.story_beacon_hp)}/{int(self.story_beacon_max)}"
-            draw_text(self.screen, self.font_tiny, beacon_value, (bx + bar_w + 8, by - 1), C_TEXT_DIM, shadow=False)
+            beacon_label = f"Beacon: {int(self.story_beacon_hp)}/{int(self.story_beacon_max)}"
+            draw_text(self.screen, self.font_ui, beacon_label, (text_x, text_y + 56), C_TEXT)
         else:
             draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (text_x, text_y + 56), C_TEXT)
         draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (text_x, text_y + 84), C_COIN)
@@ -4408,21 +4234,19 @@ class Game:
         self.draw_minimap(map_rect)
 
         if self.mode == "story":
-            story_w = 620
-            story_h = 54
+            story_w = 640
+            story_h = 62
             story_x = WIDTH // 2 - story_w // 2
-            top_hud_bottom = max(panel.bottom, panel2.bottom) + 2
+            top_hud_bottom = max(panel.bottom, panel2.bottom) + 8
             story_y = top_hud_bottom
-            max_h = max(44, HEIGHT - story_y - 12)
-            story_h = min(story_h, max_h)
             story_panel = pygame.Rect(story_x, story_y, story_w, story_h)
             pygame.draw.rect(self.screen, (*C_PANEL, 215), story_panel, border_radius=12)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), story_panel, 2, border_radius=12)
             level_label = f"STORY LEVEL {self.story_level_index}: {self.story_config.get('name', '') if self.story_config else ''}"
             obj_label = self.story_objective_progress_text()
-            draw_text(self.screen, self.font_small, level_label, (story_panel.centerx, story_panel.y + 8),
+            draw_text(self.screen, self.font_small, level_label, (story_panel.centerx, story_panel.y + 12),
                       C_ACCENT, center=True, shadow=False)
-            draw_text(self.screen, self.font_small, obj_label, (story_panel.centerx, story_panel.y + 30),
+            draw_text(self.screen, self.font_small, obj_label, (story_panel.centerx, story_panel.y + 34),
                       C_TEXT, center=True, shadow=False)
 
         boss = self._get_boss()
@@ -4600,14 +4424,6 @@ class Game:
         self.menu_quit_btn.update(1 / 60, mouse_pos, mouse_down, events)
         self.menu_quit_btn.draw(self.screen, self.font_med)
 
-        if self.menu_daily_wheel_btn:
-            self.menu_daily_wheel_btn.update(1 / 60, mouse_pos, mouse_down, events)
-            self.menu_daily_wheel_btn.draw(self.screen, self.font_med)
-            self.draw_wheel_icon(self.menu_daily_wheel_btn.rect, self.menu_daily_wheel_btn.hover)
-            draw_text(self.screen, self.font_tiny, "Daily", (self.menu_daily_wheel_btn.rect.centerx,
-                                                            self.menu_daily_wheel_btn.rect.bottom + 14),
-                      C_TEXT_DIM, center=True, shadow=False)
-
 
         controls1 = "WASD to move • Mouse to aim • Hold LMB to shoot"
         controls2 = "Space to dash • F to toggle auto-fire • ESC to pause"
@@ -4616,86 +4432,6 @@ class Game:
 
         pygame.draw.circle(self.screen, (*C_ACCENT, 255), (int(cx + math.sin(t * 1.3) * 320), 156), 3)
         pygame.draw.circle(self.screen, (*C_ACCENT_2, 255), (int(cx + math.cos(t * 1.1) * 300), 156), 3)
-
-    def draw_wheel_icon(self, rect: pygame.Rect, hover=False):
-        center = rect.center
-        radius = rect.width // 2 - 12
-        icon_col = C_ACCENT if hover else C_TEXT_DIM
-        pygame.draw.circle(self.screen, icon_col, center, radius, 2)
-        for i in range(8):
-            ang = math.tau * (i / 8) - math.pi / 2
-            end = (center[0] + math.cos(ang) * radius, center[1] + math.sin(ang) * radius)
-            pygame.draw.line(self.screen, icon_col, center, end, 1)
-        stand = pygame.Rect(0, 0, 16, 8)
-        stand.center = (center[0], center[1] + radius + 8)
-        pygame.draw.rect(self.screen, icon_col, stand, border_radius=3)
-
-    def draw_daily_wheel(self, events, dt):
-        self.screen.fill(C_BG)
-        cx = WIDTH // 2
-        draw_text(self.screen, self.font_big, "DAILY WHEEL", (cx, 92), C_TEXT, center=True)
-        draw_text(self.screen, self.font_ui, "Spin once every 24 hours for a reward", (cx, 128),
-                  C_TEXT_DIM, center=True, shadow=False)
-
-        wheel_center = (cx, HEIGHT // 2 - 10)
-        wheel_radius = 170
-        slice_angle = math.tau / len(DAILY_WHEEL_REWARDS)
-        slice_colors = [C_PANEL_2, C_PANEL, (28, 34, 50), (22, 28, 42)]
-
-        for i, reward in enumerate(DAILY_WHEEL_REWARDS):
-            start = self.daily_wheel_angle + i * slice_angle
-            end = start + slice_angle
-            points = [wheel_center]
-            steps = 10
-            for s in range(steps + 1):
-                ang = start + (end - start) * (s / steps)
-                px = wheel_center[0] + math.cos(ang) * wheel_radius
-                py = wheel_center[1] + math.sin(ang) * wheel_radius
-                points.append((px, py))
-            pygame.draw.polygon(self.screen, slice_colors[i % len(slice_colors)], points)
-            pygame.draw.polygon(self.screen, (*C_WALL_EDGE, 200), points, 1)
-
-            mid = start + slice_angle / 2
-            label_pos = (
-                wheel_center[0] + math.cos(mid) * (wheel_radius * 0.62),
-                wheel_center[1] + math.sin(mid) * (wheel_radius * 0.62),
-            )
-            draw_text(self.screen, self.font_tiny, reward["short"], label_pos, C_TEXT, center=True, shadow=False)
-
-        pygame.draw.circle(self.screen, (*C_WALL_EDGE, 210), wheel_center, wheel_radius, 3)
-        pygame.draw.circle(self.screen, (*C_PANEL, 200), wheel_center, 8)
-
-        pointer_y = wheel_center[1] - wheel_radius - 12
-        pointer = [
-            (wheel_center[0], pointer_y),
-            (wheel_center[0] - 12, pointer_y + 18),
-            (wheel_center[0] + 12, pointer_y + 18),
-        ]
-        pygame.draw.polygon(self.screen, C_ACCENT_2, pointer)
-
-        remaining = self.daily_wheel_remaining()
-        available = remaining <= 0.0
-        status_text = "Ready to spin!" if available else f"Available in {self.format_cooldown(remaining)}"
-        draw_text(self.screen, self.font_small, status_text, (cx, wheel_center[1] + wheel_radius + 36),
-                  C_TEXT_DIM if not available else C_ACCENT, center=True, shadow=False)
-
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_down = any(e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 for e in events)
-
-        if self.daily_wheel_spin_btn:
-            self.daily_wheel_spin_btn.enabled = available and not self.daily_wheel_spinning
-            self.daily_wheel_spin_btn.update(dt, mouse_pos, mouse_down, events)
-            self.daily_wheel_spin_btn.draw(self.screen, self.font_med)
-
-        if self.daily_wheel_back_btn:
-            self.daily_wheel_back_btn.update(dt, mouse_pos, mouse_down, events)
-            self.daily_wheel_back_btn.draw(self.screen, self.font_med)
-
-        if self.daily_wheel_message_timer > 0:
-            msg_box = pygame.Rect(cx - 260, wheel_center[1] + wheel_radius + 60, 520, 48)
-            pygame.draw.rect(self.screen, (*C_PANEL, 230), msg_box, border_radius=12)
-            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 210), msg_box, 2, border_radius=12)
-            draw_text(self.screen, self.font_small, self.daily_wheel_message, msg_box.center, C_TEXT, center=True)
 
     def draw_story_menu(self, events):
         self.screen.fill(C_BG)
@@ -5598,10 +5334,6 @@ class Game:
 
             elif self.state == "menu":
                 self.draw_menu(events)
-
-            elif self.state == "daily_wheel":
-                self.update_daily_wheel(dt)
-                self.draw_daily_wheel(events, dt)
 
             elif self.state == "story_menu":
                 self.draw_story_menu(events)
