@@ -18,6 +18,10 @@
 ### New Features
 - Added **Windscreen Wiper**, an exclusive, limited, and overpowered tank
 
+### Improvements
+- Improved Boss Tracker
+- Improved Powerup Tracker
+
 ### Gameplay
 - Heal Orb healing reduced from **2 HP → 1 HP**
 - Omni Pistol damage reduced from **11 → 8**
@@ -26,10 +30,6 @@
   - Hard mode: **3 HP → 2 HP**
 - Improved boss death loot
 - Flamethrower bullet life increased from **0.35 → 0.45**
-
-### Improvements
-- Improved Boss Tracker
-- Improved Powerup Tracker
 
 ---
 
@@ -138,7 +138,8 @@
 ---
 
 ## v1.6.1 -- Story Mode Polish
-### Imrpovements
+
+### Improvements
 - Removed the cyan overlay in the Leaderboard tab
 - Changed 1st, 2nd, 3rd etc. place numbers to white
 - Story Mode adjustments and polishes
@@ -151,6 +152,26 @@
     - A dash attack
     - A rocket strike from the sky
   - Universal Changes: The difficulty ramping of Levels 2, 3, 4, and 5 was decreased by 50%
+
+---
+
+## v1.6.2 -- HUD and UI Enhancements
+
+### New Features
+- Added a Mini Map to the top-right gameplay HUD, showing the whole map with player, enemies, and obstacles
+
+### Improvements
+- Moved the Story Mode objective bar to the top of the screen so it no longer obstructs gameplay
+- Adjusted the Bundles tab layout so that all bundles fit within the page
+- Replaced the player's HP display with the Beacon's HP display on Level 4 of Story Mode
+
+### Gameplay
+- Increased Beacon's max HP by 5 in Level 4 of Story Mode
+- Prevented Ranged enemies from spawning in Level 4 of Story Mode
+
+### Bug Fixes
+- Removed the cyan overlay on the number "1" on the Leaderboard
+- Fixed Leaderboard rank colors so all positions from 1 to 10 are white
 
 ---
 
@@ -173,6 +194,7 @@
 - Remove the cyan overlay on the number "1." in the Leaderboard
 - Make ALL numbers (1 - 10) on the Leaderboard white
 - In Story Mode, move the objective bar to the top, but make sure none of the tabs overlay
-- On Level 4 in Story Mode, give the Beacon 5 extra hp and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
+- On Level 4 in Story Mode, give the Beacon 5 extra HP and remove the ability of the Ranged enemies to spawn on that level. Replace the player's health points on the top right with the Beacon's
+
 
 
