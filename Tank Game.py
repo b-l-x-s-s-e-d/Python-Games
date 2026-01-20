@@ -234,8 +234,8 @@ LEVELS = [
         "arena_size": (2200, 2000),
         "obstacles": {"count": 20, "min": (90, 70), "max": (200, 150)},
         "spawn": {"interval": 1.05, "cap": 12},
-        "enemy_weights": {"chaser": 0.45, "ranged": 0.35, "tank": 0.2},
-        "special": {"objective_point": "center", "beacon_hp": 20},
+        "enemy_weights": {"chaser": 0.55, "tank": 0.25, "sprinter": 0.2},
+        "special": {"objective_point": "center", "beacon_hp": 25},
         "difficulty": 0.25,
     },
     {
@@ -1859,6 +1859,7 @@ class Game:
         self.story_beacon_radius: int = 18
         self.story_beacon_iframes = 0.0
         self.boss_rocket_strikes: List[Dict[str, object]] = []
+        self.minimap_obstacle_cache: List[Tuple[float, float, float, float]] = []
 
         self.arena_rect = pygame.Rect(0, 0, ARENA_W, ARENA_H)
 
@@ -2000,6 +2001,7 @@ class Game:
                     break
             if ok:
                 self.obstacles.append(r)
+        self._cache_minimap_obstacles()
 
     def _generate_story_obstacles(self, config: Dict[str, object]):
         self.obstacles.clear()
@@ -2024,6 +2026,20 @@ class Game:
                     break
             if ok:
                 self.obstacles.append(r)
+        self._cache_minimap_obstacles()
+
+    def _cache_minimap_obstacles(self):
+        """Cache normalized obstacle rects for minimap rendering."""
+        self.minimap_obstacle_cache = []
+        arena = self.arena_rect
+        if arena.width <= 0 or arena.height <= 0:
+            return
+        for r in self.obstacles:
+            fx = (r.x - arena.left) / arena.width
+            fy = (r.y - arena.top) / arena.height
+            fw = r.w / arena.width
+            fh = r.h / arena.height
+            self.minimap_obstacle_cache.append((fx, fy, fw, fh))
 
     # ---------------- UI build ----------------
     def _build_menus(self):
@@ -4099,6 +4115,55 @@ class Game:
                 return e
         return None
 
+    def draw_minimap(self, map_rect: pygame.Rect):
+        pygame.draw.rect(self.screen, (*C_PANEL_2, 230), map_rect, border_radius=8)
+        pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), map_rect, 2, border_radius=8)
+
+        arena = self.arena_rect
+        if arena.width <= 0 or arena.height <= 0:
+            return
+
+        inner = map_rect.inflate(-4, -4)
+
+        def world_to_minimap(pos: Vector2) -> Tuple[int, int]:
+            # World -> minimap transform (cached world bounds, clamped to map rect).
+            mx = map_rect.left + (pos.x - arena.left) / arena.width * map_rect.w
+            my = map_rect.top + (pos.y - arena.top) / arena.height * map_rect.h
+            mx = clamp(mx, inner.left, inner.right)
+            my = clamp(my, inner.top, inner.bottom)
+            return int(mx), int(my)
+
+        for fx, fy, fw, fh in self.minimap_obstacle_cache:
+            rx = map_rect.left + fx * map_rect.w
+            ry = map_rect.top + fy * map_rect.h
+            rw = max(2, fw * map_rect.w)
+            rh = max(2, fh * map_rect.h)
+            rect = pygame.Rect(int(rx), int(ry), int(rw), int(rh))
+            pygame.draw.rect(self.screen, (40, 46, 70), rect, border_radius=3)
+
+        if self.mode == "story" and self.story_hazard_zones:
+            for hz in self.story_hazard_zones:
+                rect = hz["rect"]
+                rx = map_rect.left + (rect.x - arena.left) / arena.width * map_rect.w
+                ry = map_rect.top + (rect.y - arena.top) / arena.height * map_rect.h
+                rw = max(2, rect.w / arena.width * map_rect.w)
+                rh = max(2, rect.h / arena.height * map_rect.h)
+                hrect = pygame.Rect(int(rx), int(ry), int(rw), int(rh))
+                pygame.draw.rect(self.screen, (200, 90, 120), hrect, 1, border_radius=2)
+
+        for e in self.enemies:
+            ex, ey = world_to_minimap(e.pos)
+            pygame.draw.circle(self.screen, (255, 150, 190), (ex, ey), 2)
+
+        if self.beacon_active():
+            bx, by = world_to_minimap(self.story_beacon_pos)
+            pygame.draw.circle(self.screen, (255, 220, 140), (bx, by), 3)
+            pygame.draw.circle(self.screen, (120, 80, 40), (bx, by), 4, 1)
+
+        px, py = world_to_minimap(self.player.pos)
+        pygame.draw.circle(self.screen, C_PLAYER, (px, py), 3)
+        pygame.draw.circle(self.screen, (20, 30, 40), (px, py), 4, 1)
+
     def draw_hud(self):
         x = UI_PAD
         y = UI_PAD
@@ -4151,16 +4216,29 @@ class Game:
         pygame.draw.rect(self.screen, (*C_PANEL, 220), panel2, border_radius=12)
         pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), panel2, 2, border_radius=12)
 
-        draw_text(self.screen, self.font_ui, f"Score: {self.player.score}", (sx, sy), C_TEXT)
-        draw_text(self.screen, self.font_ui, f"Wave: {self.wave}", (sx, sy + 28), C_TEXT)
-        draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (sx, sy + 56), C_TEXT)
-        draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (sx, sy + 84), C_COIN)
+        map_size = 96
+        map_pad = 12
+        map_rect = pygame.Rect(panel2.right - map_size - map_pad, panel2.y + map_pad, map_size, map_size)
+        text_x = panel2.x + 14
+        text_y = panel2.y + 10
+
+        draw_text(self.screen, self.font_ui, f"Score: {self.player.score}", (text_x, text_y), C_TEXT)
+        draw_text(self.screen, self.font_ui, f"Wave: {self.wave}", (text_x, text_y + 28), C_TEXT)
+        if self.mode == "story" and self.story_level_index == 4 and self.beacon_active():
+            beacon_label = f"Beacon: {int(self.story_beacon_hp)}/{int(self.story_beacon_max)}"
+            draw_text(self.screen, self.font_ui, beacon_label, (text_x, text_y + 56), C_TEXT)
+        else:
+            draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (text_x, text_y + 56), C_TEXT)
+        draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (text_x, text_y + 84), C_COIN)
+
+        self.draw_minimap(map_rect)
 
         if self.mode == "story":
             story_w = 640
             story_h = 62
             story_x = WIDTH // 2 - story_w // 2
-            story_y = UI_PAD + 140
+            top_hud_bottom = max(panel.bottom, panel2.bottom) + 8
+            story_y = top_hud_bottom
             story_panel = pygame.Rect(story_x, story_y, story_w, story_h)
             pygame.draw.rect(self.screen, (*C_PANEL, 215), story_panel, border_radius=12)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), story_panel, 2, border_radius=12)
@@ -4550,11 +4628,10 @@ class Game:
                 pygame.draw.rect(self.screen, (*C_WALL_EDGE, 150), row, 1, border_radius=10)
 
                 badge = pygame.Rect(row.x + 8, row.y + 8, 48, row_h - 16)
-                badge_color = (*C_ACCENT, 220) if idx == 1 else (*C_PANEL, 220)
+                badge_color = (*C_PANEL, 220)
                 pygame.draw.rect(self.screen, badge_color, badge, border_radius=8)
                 pygame.draw.rect(self.screen, (*C_WALL_EDGE, 190), badge, 2, border_radius=8)
-                rank_color = (255, 255, 255) if idx <= 3 else (10, 20, 20)
-                rect_centered_text(self.screen, self.font_small, f"{idx}", badge, rank_color, shadow=False)
+                rect_centered_text(self.screen, self.font_small, f"{idx}", badge, (255, 255, 255), shadow=False)
 
                 draw_text(self.screen, self.font_ui, f"{entry['score']}", (col_score, row.y + 12), C_TEXT, shadow=False)
                 draw_text(self.screen, self.font_ui, f"{entry['time']}s", (col_time, row.y + 12), C_TEXT, shadow=False)
@@ -5000,8 +5077,8 @@ class Game:
             x0 = box.x + 18
             y = box.y + 14
 
-            row_h = 86
-            gap = 12
+            row_h = 80
+            gap = 8
             row_w = box.w - 36
 
             for bundle in page_items:
