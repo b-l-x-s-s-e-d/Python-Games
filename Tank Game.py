@@ -9,7 +9,7 @@ import time
 import struct
 import traceback
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Set
 
 import pygame
 from pygame.math import Vector2
@@ -82,6 +82,7 @@ C_DASHER = (210, 160, 255)     # Purple
 
 C_BOSS = (255, 85, 95)         # Red
 C_BOSS_EDGE = (255, 190, 210)
+C_ELITE_OUTLINE = (255, 235, 120)
 
 C_BULLET = (240, 240, 255)
 C_EBULLET = (255, 120, 90)
@@ -109,6 +110,7 @@ ENEMY_RADIUS_RANGED = 15
 ENEMY_RADIUS_TANK = 20
 ENEMY_RADIUS_SPRINTER = 11
 ENEMY_RADIUS_DASHER = 16
+ENEMY_RADIUS_KNIGHT = 24
 
 BULLET_RADIUS_PLAYER = 4
 BULLET_RADIUS_ENEMY = 4
@@ -134,6 +136,7 @@ RANGED_SPEED_BASE, RANGED_SPEED_HARD = 110.0, 240.0
 TANK_SPEED_BASE, TANK_SPEED_HARD = 75.0, 160.0
 SPRINTER_SPEED_BASE, SPRINTER_SPEED_HARD = 175.0, 360.0
 DASHER_SPEED_BASE, DASHER_SPEED_HARD = 115.0, 255.0
+KNIGHT_SPEED_BASE, KNIGHT_SPEED_HARD = 45.0, 90.0
 
 SPAWN_RATE_BASE = 1.35
 SPAWN_RATE_HARD = 0.9
@@ -197,6 +200,15 @@ AUDIO_ENABLED_DEFAULT = True
 # Boss rules
 BOSS_EVERY_WAVES = 10
 BOSS_GRACE_AFTER_DEATH = 3  # seconds where normal spawning is paused after boss dies
+
+# Late-game modifiers
+LATE_GAME_START_WAVE = 20
+MID_LATE_START_WAVE = 25
+LATE_LATE_START_WAVE = 35
+MODIFIER_WAVE_MIN = 2
+MODIFIER_WAVE_MAX = 3
+MODIFIER_MIN_STACK = 2
+MODIFIER_MAX_STACK = 3
 
 # =========================================================
 # STORY MODE CONFIG
@@ -1055,6 +1067,148 @@ WEAPONS: Dict[str, WeaponDef] = {
 
 
 # =========================================================
+# LATE-GAME MODIFIERS
+# =========================================================
+@dataclass(frozen=True)
+class ModifierDef:
+    id: str
+    name: str
+    desc: str
+    tiers: Tuple[str, ...]
+    weight: float = 1.0
+
+
+LATE_GAME_MODIFIERS = [
+    ModifierDef(
+        id="enemy_accel",
+        name="Adrenaline Rush",
+        desc="Enemies accelerate the longer they stay alive.",
+        tiers=("early",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="spawn_uneven",
+        name="Pressure Spikes",
+        desc="Enemy spawns favor uneven hot zones.",
+        tiers=("early",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="knight_enemy",
+        name="Knight Arrival",
+        desc="Knight enemies enter the fray.",
+        tiers=("early",),
+        weight=0.9,
+    ),
+    ModifierDef(
+        id="resist_over_time",
+        name="Adaptive Plating",
+        desc="Enemies gain slight resistance over time.",
+        tiers=("early",),
+        weight=0.95,
+    ),
+    ModifierDef(
+        id="turning_speed",
+        name="Rapid Turns",
+        desc="Enemies turn faster and adjust quickly.",
+        tiers=("early",),
+        weight=0.95,
+    ),
+    ModifierDef(
+        id="spawn_bursts",
+        name="Burst Spawns",
+        desc="Delayed spawn bursts replace smooth spawns.",
+        tiers=("early",),
+        weight=0.9,
+    ),
+    ModifierDef(
+        id="elite_spawn",
+        name="Elite Scouts",
+        desc="Elite enemies spawn across the map.",
+        tiers=("mid",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="tight_clusters",
+        name="Tight Formations",
+        desc="Enemy waves spawn in tighter clusters.",
+        tiers=("mid",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="double_ranged",
+        name="Twin Salvos",
+        desc="Ranged enemies fire 2 bullets per shot.",
+        tiers=("mid",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="knight_frequent",
+        name="Knight Vanguard",
+        desc="Knight enemies spawn more frequently.",
+        tiers=("mid",),
+        weight=0.9,
+    ),
+    ModifierDef(
+        id="enemy_dashes",
+        name="Sudden Dashes",
+        desc="Enemies occasionally dash short distances.",
+        tiers=("mid",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="death_explosions",
+        name="Death Blasts",
+        desc="Enemies explode shortly after death.",
+        tiers=("late",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="curving_shots",
+        name="Homing Fire",
+        desc="Enemy projectiles curve toward the player.",
+        tiers=("late",),
+        weight=0.95,
+    ),
+    ModifierDef(
+        id="enemy_regen",
+        name="Regeneration Field",
+        desc="Nearby enemies heal each other rapidly.",
+        tiers=("late",),
+        weight=0.9,
+    ),
+    ModifierDef(
+        id="elite_frenzy",
+        name="Elite Surge",
+        desc="Elite enemies spawn much more frequently.",
+        tiers=("late",),
+        weight=1.0,
+    ),
+    ModifierDef(
+        id="overlord_waves",
+        name="Overlord Cycle",
+        desc="Overlord battle every 3 waves.",
+        tiers=("late",),
+        weight=0.9,
+    ),
+    ModifierDef(
+        id="revive_once",
+        name="Second Wind",
+        desc="Enemies revive once with reduced HP.",
+        tiers=("late",),
+        weight=0.95,
+    ),
+    ModifierDef(
+        id="speed_ramp",
+        name="Overdrive",
+        desc="Global enemy speed ramps during the wave.",
+        tiers=("late",),
+        weight=1.0,
+    ),
+]
+
+
+# =========================================================
 # ENEMIES
 # =========================================================
 class EnemyBase:
@@ -1063,12 +1217,20 @@ class EnemyBase:
         self.vel = Vector2(0, 0)
         self.hp = hp
         self.hp_max = hp
+        self.base_speed = speed
         self.speed = speed
         self.radius = radius
         self.color = color
         self.damage_contact = 1
         self.score_value = 10
         self.hit_flash = 0.0
+        self.age = 0.0
+        self.elite = False
+        self.revives_remaining = 0
+        self.revive_hp_ratio = 0.45
+        self.extra_dash_cd = 0.0
+        self.extra_dash_timer = 0.0
+        self.extra_dash_dir = Vector2(1, 0)
         self.last_hit_weapon_id: Optional[str] = None
         self.last_hit_by_player: bool = False
 
@@ -1104,6 +1266,8 @@ class EnemyBase:
         col = (255, 255, 255) if self.hit_flash > 0 else self.color
         pygame.draw.circle(surf, col, p, self.radius)
         circle_outline(surf, (25, 25, 35), p, self.radius + 3, 2)
+        if self.elite:
+            circle_outline(surf, C_ELITE_OUTLINE, p, self.radius + 6, 2)
 
         # hp bar (small)
         w = self.radius * 2
@@ -1126,7 +1290,7 @@ class Chaser(EnemyBase):
         d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
-            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 6.5))
+            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 6.5 * game.enemy_turn_speed_mult()))
         self.pos += self.vel * dt
         game.resolve_circle_walls(self, damping=0.2)
 
@@ -1148,13 +1312,13 @@ class Ranged(EnemyBase):
         if dist > 430:
             if dist > 1:
                 desired = d.normalize() * self.speed
-                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 5.0))
+                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 5.0 * game.enemy_turn_speed_mult()))
         elif dist < 270:
             if dist > 1:
                 desired = (-d).normalize() * (self.speed * 0.95)
-                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 7.0))
+                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 7.0 * game.enemy_turn_speed_mult()))
         else:
-            self.vel *= (1.0 - min(dt * 6.5, 0.25))
+            self.vel *= (1.0 - min(dt * 6.5 * game.enemy_turn_speed_mult(), 0.25))
 
         self.pos += self.vel * dt
         game.resolve_circle_walls(self, damping=0.2)
@@ -1166,17 +1330,21 @@ class Ranged(EnemyBase):
                         dirn = d.normalize()
                         spd = RANGED_BULLET_SPEED_BASE + 60.0 * game.diff_eased
                         dmg = int(round(lerp(RANGED_DAMAGE_BASE, RANGED_DAMAGE_HARD, game.diff_eased)))
-                        vel = dirn * spd
-                        b = Projectile(
-                            self.pos + dirn * (self.radius + 6),
-                            vel,
-                            damage=dmg,
-                            owner="enemy",
-                            color=C_EBULLET,
-                            radius=BULLET_RADIUS_ENEMY,
-                            lifetime=RANGED_BULLET_LIFETIME,
-                        )
-                        game.enemy_projectiles.append(b)
+                        shots = 2 if game.is_modifier_active("double_ranged") else 1
+                        spread = 10.0 if shots > 1 else 0.0
+                        for i in range(shots):
+                            ang = 0.0 if shots == 1 else lerp(-spread * 0.5, spread * 0.5, i / (shots - 1))
+                            vel = dirn.rotate(ang) * spd
+                            b = Projectile(
+                                self.pos + dirn * (self.radius + 6),
+                                vel,
+                                damage=dmg,
+                                owner="enemy",
+                                color=C_EBULLET,
+                                radius=BULLET_RADIUS_ENEMY,
+                                lifetime=RANGED_BULLET_LIFETIME,
+                            )
+                            game.enemy_projectiles.append(b)
                         game.audio_play("enemy_shoot")
                     self.shoot_cd = random.uniform(RANGED_COOLDOWN_MIN, RANGED_COOLDOWN_MAX)
 
@@ -1192,9 +1360,25 @@ class Tank(EnemyBase):
         d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
-            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 4.0))
+            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 4.0 * game.enemy_turn_speed_mult()))
         self.pos += self.vel * dt
         game.resolve_circle_walls(self, damping=0.15)
+
+
+class Knight(EnemyBase):
+    def __init__(self, pos, hp, speed):
+        super().__init__(pos, hp, speed, radius=ENEMY_RADIUS_KNIGHT, color=(210, 190, 140))
+        self.damage_contact = 3
+        self.score_value = 38
+
+    def update(self, dt, game):
+        target = game.enemy_target_pos()
+        d = target - self.pos
+        if d.length_squared() > 1:
+            desired = d.normalize() * self.speed
+            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 3.2 * game.enemy_turn_speed_mult()))
+        self.pos += self.vel * dt
+        game.resolve_circle_walls(self, damping=0.12)
 
 
 class Sprinter(EnemyBase):
@@ -1208,7 +1392,7 @@ class Sprinter(EnemyBase):
         d = target - self.pos
         if d.length_squared() > 1:
             desired = d.normalize() * self.speed
-            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 9.0))
+            self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 9.0 * game.enemy_turn_speed_mult()))
         self.pos += self.vel * dt
         game.resolve_circle_walls(self, damping=0.25)
 
@@ -1232,11 +1416,11 @@ class Dasher(EnemyBase):
         if self.dash_time > 0:
             if dist2 > 1:
                 steer = d.normalize()
-                self.vel = self.vel.lerp(steer * (self.speed * 2.6), 1 - math.exp(-dt * 10.0))
+                self.vel = self.vel.lerp(steer * (self.speed * 2.6), 1 - math.exp(-dt * 10.0 * game.enemy_turn_speed_mult()))
         else:
             if dist2 > 1:
                 desired = d.normalize() * self.speed
-                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 6.0))
+                self.vel = self.vel.lerp(desired, 1 - math.exp(-dt * 6.0 * game.enemy_turn_speed_mult()))
 
             if self.dash_cd <= 0 and dist2 < (620 * 620):
                 self.dash_time = 0.22
@@ -2109,10 +2293,32 @@ class Game:
         self.wave_timer = WAVE_TIME_BASE
         self.spawn_timer = 0.0
         self.spawn_interval = SPAWN_RATE_BASE
+        self.spawn_burst_remaining = 0
+        self.spawn_burst_timer = 0.0
+        self.spawn_cluster_anchor = None
+        self.spawn_cluster_timer = 0.0
+        self.spawn_bias_angle = 0.0
+        self.spawn_burst_remaining = 0
+        self.spawn_burst_timer = 0.0
+        self.spawn_cluster_anchor = None
+        self.spawn_cluster_timer = 0.0
+        self.spawn_bias_angle = 0.0
+        self.spawn_burst_remaining = 0
+        self.spawn_burst_timer = 0.0
+        self.spawn_cluster_anchor: Optional[Vector2] = None
+        self.spawn_cluster_timer = 0.0
+        self.spawn_bias_angle = 0.0
 
         # Difficulty
         self.difficulty = 0.0
         self.diff_eased = 0.0
+
+        # Late-game modifiers
+        self.active_modifiers: List[ModifierDef] = []
+        self.active_modifier_ids: Set[str] = set()
+        self.modifier_last_ids: Set[str] = set()
+        self.modifier_cycle_end_wave = LATE_GAME_START_WAVE
+        self.pending_enemy_explosions: List[Dict[str, object]] = []
 
         # Powerup spawn timer
         self.powerup_timer = random.uniform(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX)
@@ -2530,6 +2736,11 @@ class Game:
         self.wave_timer = WAVE_TIME_BASE
         self.spawn_timer = 0.0
         self.spawn_interval = float(config.get("spawn", {}).get("interval", SPAWN_RATE_BASE))
+        self.spawn_burst_remaining = 0
+        self.spawn_burst_timer = 0.0
+        self.spawn_cluster_anchor = None
+        self.spawn_cluster_timer = 0.0
+        self.spawn_bias_angle = 0.0
 
         self.difficulty = float(config.get("difficulty", 0.35))
         self.diff_eased = self.difficulty
@@ -2556,6 +2767,24 @@ class Game:
         self.boss_alive = False
         self.boss_banner_timer = 0.0
         self.boss_grace_timer = 0.0
+
+        self.active_modifiers = []
+        self.active_modifier_ids = set()
+        self.modifier_last_ids = set()
+        self.modifier_cycle_end_wave = LATE_GAME_START_WAVE
+        self.pending_enemy_explosions = []
+
+        self.active_modifiers = []
+        self.active_modifier_ids = set()
+        self.modifier_last_ids = set()
+        self.modifier_cycle_end_wave = LATE_GAME_START_WAVE
+        self.pending_enemy_explosions = []
+
+        self.active_modifiers = []
+        self.active_modifier_ids = set()
+        self.modifier_last_ids = set()
+        self.modifier_cycle_end_wave = LATE_GAME_START_WAVE
+        self.pending_enemy_explosions = []
 
         self.story_start_time = time.time()
         self.story_elapsed = 0.0
@@ -2656,6 +2885,114 @@ class Game:
 
     def boss_specials_active(self) -> bool:
         return self.mode == "story" and self.story_level_index == 6
+
+    def modifier_phase(self) -> Optional[str]:
+        if self.mode != "endless":
+            return None
+        if self.wave >= LATE_LATE_START_WAVE:
+            return "late"
+        if self.wave >= MID_LATE_START_WAVE:
+            return "mid"
+        if self.wave >= LATE_GAME_START_WAVE:
+            return "early"
+        return None
+
+    def is_modifier_active(self, modifier_id: str) -> bool:
+        return modifier_id in self.active_modifier_ids
+
+    def enemy_turn_speed_mult(self) -> float:
+        return 1.25 if self.is_modifier_active("turning_speed") else 1.0
+
+    def modifier_waves_remaining(self) -> int:
+        if not self.active_modifiers:
+            return 0
+        return max(0, self.modifier_cycle_end_wave - self.wave)
+
+    def _modifier_candidates(self, phase: str) -> List[ModifierDef]:
+        if phase == "early":
+            tiers = {"early"}
+        elif phase == "mid":
+            tiers = {"early", "mid"}
+        else:
+            tiers = {"early", "mid", "late"}
+        return [m for m in LATE_GAME_MODIFIERS if any(t in tiers for t in m.tiers)]
+
+    def _modifier_phase_weight(self, modifier: ModifierDef, phase: str) -> float:
+        if phase == "early":
+            return 1.0
+        if phase == "mid":
+            return 1.25 if "mid" in modifier.tiers else 1.0
+        if "late" in modifier.tiers:
+            return 1.4
+        if "mid" in modifier.tiers:
+            return 1.2
+        return 1.0
+
+    def _pick_modifiers(self, phase: str, avoid: Set[str]) -> List[ModifierDef]:
+        candidates = self._modifier_candidates(phase)
+        chosen: List[ModifierDef] = []
+        count = 1
+        if phase == "late":
+            count = random.randint(MODIFIER_MIN_STACK, MODIFIER_MAX_STACK)
+        for _ in range(count):
+            pool = [m for m in candidates if m.id not in avoid and m.id not in {c.id for c in chosen}]
+            if not pool:
+                pool = [m for m in candidates if m.id not in {c.id for c in chosen}]
+            weights = {m.id: m.weight * self._modifier_phase_weight(m, phase) for m in pool}
+            pick_id = weighted_choice(weights)
+            pick = next(m for m in pool if m.id == pick_id)
+            chosen.append(pick)
+        return chosen
+
+    def advance_late_game_modifiers(self):
+        phase = self.modifier_phase()
+        if phase is None:
+            self.active_modifiers = []
+            self.active_modifier_ids = set()
+            return
+        if self.active_modifiers and self.wave < self.modifier_cycle_end_wave:
+            return
+        cycle_len = random.randint(MODIFIER_WAVE_MIN, MODIFIER_WAVE_MAX)
+        self.modifier_cycle_end_wave = self.wave + cycle_len
+        new_mods = self._pick_modifiers(phase, self.modifier_last_ids)
+        self.active_modifiers = new_mods
+        self.active_modifier_ids = {m.id for m in new_mods}
+        self.modifier_last_ids = {m.id for m in new_mods}
+        self.spawn_bias_angle = random.uniform(0, math.tau)
+        self.spawn_cluster_anchor = None
+        self.spawn_cluster_timer = 0.0
+        self.spawn_burst_remaining = 0
+        self.spawn_burst_timer = 0.0
+        if self.is_modifier_active("enemy_dashes"):
+            for e in self.enemies:
+                if not isinstance(e, (Boss, Dasher)):
+                    e.extra_dash_cd = random.uniform(0.6, 2.4)
+        if self.is_modifier_active("revive_once"):
+            for e in self.enemies:
+                if not isinstance(e, Boss):
+                    e.revives_remaining = max(e.revives_remaining, 1)
+
+    def enemy_speed_multiplier(self, enemy: EnemyBase) -> float:
+        if isinstance(enemy, Boss):
+            return 1.0
+        mult = 1.0
+        if self.is_modifier_active("enemy_accel"):
+            mult *= 1.0 + min(0.6, enemy.age * 0.02)
+        if self.is_modifier_active("speed_ramp"):
+            wave_progress = 1.0 - clamp(self.wave_timer / max(0.1, WAVE_TIME_BASE), 0.0, 1.0)
+            mult *= 1.0 + 0.45 * wave_progress
+        return mult
+
+    def enemy_damage_multiplier(self, enemy: EnemyBase) -> float:
+        if isinstance(enemy, Boss) or not self.is_modifier_active("resist_over_time"):
+            return 1.0
+        resistance = min(0.25, enemy.age * 0.01)
+        return 1.0 - resistance
+
+    def apply_enemy_damage(self, enemy: EnemyBase, damage: int, knock_dir: Vector2, knockback: float, weapon_id: Optional[str] = None):
+        scaled = max(1, int(round(damage * self.enemy_damage_multiplier(enemy))))
+        enemy.take_damage(scaled, knock_dir, knockback, weapon_id=weapon_id, from_player=True)
+        return scaled
 
     def damage_beacon(self, amount: int):
         if not self.beacon_active():
@@ -3307,6 +3644,34 @@ class Game:
     def current_enemy_cap(self) -> int:
         return int(round(lerp(ENEMY_CAP_BASE, ENEMY_CAP_HARD, self.diff_eased)))
 
+    def update_enemy_projectiles(self, dt: float):
+        for b in self.enemy_projectiles:
+            if self.is_modifier_active("curving_shots"):
+                target = self.enemy_target_pos()
+                d = target - b.pos
+                if d.length_squared() > 1:
+                    desired = d.normalize() * max(80.0, b.vel.length())
+                    b.vel = b.vel.lerp(desired, 1 - math.exp(-dt * 1.25))
+            b.update(dt)
+
+    def update_enemy_explosions(self, dt: float):
+        if not self.pending_enemy_explosions:
+            return
+        remaining: List[Dict[str, object]] = []
+        for exp in self.pending_enemy_explosions:
+            exp["timer"] = float(exp["timer"]) - dt
+            if exp["timer"] > 0:
+                remaining.append(exp)
+                continue
+            pos = Vector2(exp["pos"])
+            radius = float(exp["radius"])
+            dmg = int(exp["damage"])
+            if (self.player.pos - pos).length_squared() <= (radius + PLAYER_RADIUS) ** 2:
+                self.damage_player(dmg)
+            self._spawn_hit_particles(pos, self.get_explosion_color())
+            self.shake = max(self.shake, 6.0)
+        self.pending_enemy_explosions = remaining
+
     # ---------------- Visibility / LOS ----------------
     def is_world_pos_onscreen(self, world_pos: Vector2, margin: int = 0) -> bool:
         cam = self.cam + self.shake_vec
@@ -3490,10 +3855,10 @@ class Game:
                 dirn = dirn.normalize()
             else:
                 dirn = Vector2(1, 0)
-            best.take_damage(dmg, dirn, 70.0, weapon_id=self.player.weapon_id, from_player=True)
+            actual = self.apply_enemy_damage(best, dmg, dirn, 70.0, weapon_id=self.player.weapon_id)
             self.update_mastery(self.player.weapon_id, hits=1)
-            self.update_challenges("damage", dmg)
-            self.float_texts.append(FloatingText(best.pos + Vector2(0, -10), str(dmg), C_ACCENT))
+            self.update_challenges("damage", actual)
+            self.float_texts.append(FloatingText(best.pos + Vector2(0, -10), str(actual), C_ACCENT))
             self._spawn_hit_particles(best.pos, (200, 220, 255))
             current = best
 
@@ -3506,11 +3871,48 @@ class Game:
                 return False
         return True
 
+    def random_arena_spawn(self, min_player_dist: float = 220.0, attempts: int = 40) -> Vector2:
+        arena = self.arena_rect
+        pos = Vector2(arena.center)
+        for _ in range(attempts):
+            pos = Vector2(
+                random.uniform(arena.left + 60, arena.right - 60),
+                random.uniform(arena.top + 60, arena.bottom - 60),
+            )
+            if (pos - self.player.pos).length() < min_player_dist:
+                continue
+            if any(r.inflate(40, 40).collidepoint(pos.x, pos.y) for r in self.obstacles):
+                continue
+            return pos
+        return pos
+
+    def pick_enemy_kind(self) -> str:
+        if self.wave < 2:
+            weights = {"chaser": 1.0}
+        elif self.wave < 4:
+            weights = {"chaser": 0.8, "sprinter": 0.2}
+        elif self.wave < 7:
+            weights = {"chaser": 0.55, "ranged": 0.25, "sprinter": 0.2}
+        elif self.wave < 11:
+            weights = {"chaser": 0.45, "ranged": 0.27, "tank": 0.14, "sprinter": 0.14}
+        else:
+            weights = {"chaser": 0.38, "ranged": 0.24, "dasher": 0.16, "tank": 0.12, "sprinter": 0.1}
+
+        if self.is_modifier_active("knight_enemy"):
+            weights["knight"] = weights.get("knight", 0.0) + 0.08
+        if self.is_modifier_active("knight_frequent"):
+            weights["knight"] = weights.get("knight", 0.0) + 0.18
+        return weighted_choice(weights)
+
     def spawn_enemy(self, kind: str):
         player = self.player
         margin = 260
         dist = max(WIDTH, HEIGHT) * 0.65 + margin
-        ang = random.uniform(0, math.tau)
+        use_bias = self.is_modifier_active("spawn_uneven")
+        if use_bias and random.random() < 0.7:
+            ang = random.gauss(self.spawn_bias_angle, 0.45)
+        else:
+            ang = random.uniform(0, math.tau)
         spawn = player.pos + Vector2(math.cos(ang), math.sin(ang)) * dist
 
         arena = self.arena_rect
@@ -3529,6 +3931,14 @@ class Game:
                 break
 
         hp_mul = lerp(ENEMY_HP_BASE_MUL, ENEMY_HP_HARD_MUL, self.diff_eased)
+        elite_chance = 0.0
+        if self.is_modifier_active("elite_frenzy"):
+            elite_chance = 0.22
+        elif self.is_modifier_active("elite_spawn"):
+            elite_chance = 0.12
+        is_elite = self.mode == "endless" and self.wave >= MID_LATE_START_WAVE and random.random() < elite_chance
+        if is_elite:
+            spawn = self.random_arena_spawn(min_player_dist=240.0)
 
         if kind == "chaser":
             spd = lerp(CHASER_SPEED_BASE, CHASER_SPEED_HARD, self.diff_eased)
@@ -3539,12 +3949,41 @@ class Game:
         elif kind == "tank":
             spd = lerp(TANK_SPEED_BASE, TANK_SPEED_HARD, self.diff_eased)
             e = Tank(spawn, hp=125 * hp_mul, speed=spd)
+        elif kind == "knight":
+            spd = lerp(KNIGHT_SPEED_BASE, KNIGHT_SPEED_HARD, self.diff_eased)
+            e = Knight(spawn, hp=375 * hp_mul, speed=spd)
         elif kind == "sprinter":
             spd = lerp(SPRINTER_SPEED_BASE, SPRINTER_SPEED_HARD, self.diff_eased)
             e = Sprinter(spawn, hp=28 * hp_mul, speed=spd)
         else:
             spd = lerp(DASHER_SPEED_BASE, DASHER_SPEED_HARD, self.diff_eased)
             e = Dasher(spawn, hp=72 * hp_mul, speed=spd)
+
+        if self.is_modifier_active("tight_clusters") and not is_elite:
+            if self.spawn_cluster_timer <= 0 or self.spawn_cluster_anchor is None:
+                self.spawn_cluster_anchor = Vector2(spawn)
+                self.spawn_cluster_timer = random.uniform(1.4, 2.6)
+            jitter = Vector2(random.uniform(-85, 85), random.uniform(-85, 85))
+            e.pos = self.spawn_cluster_anchor + jitter
+            arena = self.arena_rect
+            e.pos.x = clamp(e.pos.x, arena.left + 60, arena.right - 60)
+            e.pos.y = clamp(e.pos.y, arena.top + 60, arena.bottom - 60)
+            if any(r.inflate(40, 40).collidepoint(e.pos.x, e.pos.y) for r in self.obstacles):
+                e.pos = self.random_arena_spawn(min_player_dist=120.0)
+
+        if is_elite:
+            e.elite = True
+            e.hp *= 1.25
+            e.hp_max *= 1.25
+            e.base_speed *= 1.08
+            e.speed = e.base_speed
+            e.score_value = int(e.score_value * 1.45)
+
+        if self.is_modifier_active("revive_once"):
+            e.revives_remaining = 1
+
+        if self.is_modifier_active("enemy_dashes"):
+            e.extra_dash_cd = random.uniform(1.8, 3.2)
 
         self.enemies.append(e)
 
@@ -3740,11 +4179,14 @@ class Game:
         self.refresh_challenges()
         self.survival_time = time.time() - self.start_time
         self.update_difficulty()
+        if self.wave >= LATE_GAME_START_WAVE:
+            self.advance_late_game_modifiers()
 
         self.boss_grace_timer = max(0.0, self.boss_grace_timer - dt)
         self.boss_banner_timer = max(0.0, self.boss_banner_timer - dt)
 
         self.try_spawn_powerup(dt)
+        self.update_enemy_explosions(dt)
 
         if not self.in_boss_fight:
             self.wave_timer -= dt
@@ -3753,12 +4195,13 @@ class Game:
                 self.wave_timer = WAVE_TIME_BASE
                 self.update_challenges("waves", 1)
                 self.update_challenges("high_wave", self.wave, absolute=True)
+                self.advance_late_game_modifiers()
 
                 if self.wave == 3 and not self.counted_game:
                     self.update_mastery(self.player.weapon_id, wins=1)
                     self.counted_game = True
 
-                if self.wave % BOSS_EVERY_WAVES == 0:
+                if self.wave % BOSS_EVERY_WAVES == 0 or (self.is_modifier_active("overlord_waves") and self.wave % 3 == 0):
                     self.spawn_boss()
 
         can_spawn_normals = (not self.in_boss_fight) and (self.boss_grace_timer <= 0.0)
@@ -3769,21 +4212,23 @@ class Game:
         cap_now = self.current_enemy_cap()
 
         self.spawn_timer -= dt
-        if self.spawn_timer <= 0:
+        self.spawn_cluster_timer = max(0.0, self.spawn_cluster_timer - dt)
+        if self.is_modifier_active("spawn_bursts"):
+            if self.spawn_burst_remaining > 0:
+                self.spawn_burst_timer -= dt
+                while self.spawn_burst_remaining > 0 and self.spawn_burst_timer <= 0:
+                    self.spawn_burst_timer += 0.12
+                    if can_spawn_normals and len(self.enemies) < cap_now:
+                        self.spawn_enemy(self.pick_enemy_kind())
+                    self.spawn_burst_remaining -= 1
+            if self.spawn_timer <= 0:
+                self.spawn_timer = self.spawn_interval * random.uniform(1.2, 1.7)
+                self.spawn_burst_remaining = random.randint(3, 6)
+                self.spawn_burst_timer = 0.0
+        elif self.spawn_timer <= 0:
             self.spawn_timer = self.spawn_interval
             if can_spawn_normals and len(self.enemies) < cap_now:
-                roll = random.random()
-                if self.wave < 2:
-                    kind = "chaser"
-                elif self.wave < 4:
-                    kind = "chaser" if roll < 0.80 else "sprinter"
-                elif self.wave < 7:
-                    kind = "chaser" if roll < 0.55 else ("ranged" if roll < 0.80 else "sprinter")
-                elif self.wave < 11:
-                    kind = "chaser" if roll < 0.45 else ("ranged" if roll < 0.72 else ("tank" if roll < 0.86 else "sprinter"))
-                else:
-                    kind = "chaser" if roll < 0.38 else ("ranged" if roll < 0.62 else ("dasher" if roll < 0.78 else ("tank" if roll < 0.90 else "sprinter")))
-                self.spawn_enemy(kind)
+                self.spawn_enemy(self.pick_enemy_kind())
 
         keys = pygame.key.get_pressed()
         mx, my = pygame.mouse.get_pos()
@@ -3823,8 +4268,7 @@ class Game:
 
         for b in self.projectiles:
             b.update(dt)
-        for b in self.enemy_projectiles:
-            b.update(dt)
+        self.update_enemy_projectiles(dt)
 
         arena = self.arena_rect
         self.projectiles = [
@@ -3856,7 +4300,28 @@ class Game:
                 for oy in (-1, 0, 1):
                     neighbors.extend(buckets.get((key[0] + ox, key[1] + oy), []))
             e.apply_separation(dt, neighbors)
+            e.age += dt
+            e.speed = e.base_speed * self.enemy_speed_multiplier(e)
             e.update(dt, self)
+            if self.is_modifier_active("enemy_dashes") and not isinstance(e, (Boss, Dasher)):
+                e.extra_dash_cd = max(0.0, e.extra_dash_cd - dt)
+                if e.extra_dash_timer > 0:
+                    step = min(dt, e.extra_dash_timer)
+                    e.pos += e.extra_dash_dir * e.base_speed * 2.8 * step
+                    e.extra_dash_timer -= step
+                    self.resolve_circle_walls(e, damping=0.2)
+                elif e.extra_dash_cd <= 0:
+                    d = self.enemy_target_pos() - e.pos
+                    if d.length_squared() > 1:
+                        e.extra_dash_dir = d.normalize()
+                        e.extra_dash_timer = 0.12
+                        e.extra_dash_cd = random.uniform(2.0, 3.6)
+            if self.is_modifier_active("enemy_regen") and not isinstance(e, Boss):
+                has_neighbor = any(
+                    (n is not e) and (n.pos - e.pos).length_squared() < 170 * 170 for n in neighbors
+                )
+                if has_neighbor:
+                    e.hp = min(e.hp_max, e.hp + e.hp_max * 0.05 * dt)
             self.resolve_enemy_player_overlap(e)
 
         self._handle_bullet_enemy_collisions()
@@ -3871,6 +4336,19 @@ class Game:
                 if isinstance(e, Boss):
                     self.on_boss_killed(e)
                 else:
+                    if self.is_modifier_active("revive_once") and e.revives_remaining > 0:
+                        e.revives_remaining -= 1
+                        e.hp = max(1.0, e.hp_max * e.revive_hp_ratio)
+                        e.hit_flash = 0.2
+                        alive.append(e)
+                        continue
+                    if self.is_modifier_active("death_explosions"):
+                        self.pending_enemy_explosions.append({
+                            "pos": Vector2(e.pos),
+                            "timer": 0.35,
+                            "radius": 120.0,
+                            "damage": 2,
+                        })
                     self.player.score += e.score_value
                     if e.last_hit_by_player and e.last_hit_weapon_id:
                         self.update_mastery(e.last_hit_weapon_id, kills=1)
@@ -3974,8 +4452,7 @@ class Game:
 
         for b in self.projectiles:
             b.update(dt)
-        for b in self.enemy_projectiles:
-            b.update(dt)
+        self.update_enemy_projectiles(dt)
 
         arena = self.arena_rect
         self.projectiles = [
@@ -4150,10 +4627,10 @@ class Game:
                     knock_dir = knock_dir.normalize()
                 else:
                     knock_dir = Vector2(1, 0)
-                e.take_damage(dmg, knock_dir, 110.0, weapon_id=self.player.weapon_id, from_player=True)
+                actual = self.apply_enemy_damage(e, dmg, knock_dir, 110.0, weapon_id=self.player.weapon_id)
                 self.update_mastery(self.player.weapon_id, hits=1)
-                self.update_challenges("damage", dmg)
-                self.float_texts.append(FloatingText(e.pos + Vector2(0, -10), str(dmg), C_WARN))
+                self.update_challenges("damage", actual)
+                self.float_texts.append(FloatingText(e.pos + Vector2(0, -10), str(actual), C_WARN))
         self._spawn_hit_particles(center, self.get_explosion_color())
         self.shake = max(self.shake, 6.0)
 
@@ -4185,18 +4662,18 @@ class Game:
                     }.get(self.player.weapon_id, 1.0)
 
                     knockback = base_knock * weapon_knock * self.player.knockback_mult
-                    e.take_damage(b.damage, knock_dir, knockback, weapon_id=self.player.weapon_id, from_player=True)
+                    actual = self.apply_enemy_damage(e, b.damage, knock_dir, knockback, weapon_id=self.player.weapon_id)
                     self.update_mastery(self.player.weapon_id, hits=1)
-                    self.update_challenges("damage", b.damage)
+                    self.update_challenges("damage", actual)
                     self.float_texts.append(FloatingText(e.pos + Vector2(random.uniform(-6, 6), -10),
-                                                         str(b.damage), C_WARN))
+                                                         str(actual), C_WARN))
                     self.audio_play("hit")
                     self._spawn_hit_particles(e.pos, C_ACCENT_2)
 
                     # Chain lightning for any weapon that defines it (tesla, electricity, etc.)
                     w = self.player.weapon
                     if getattr(w, "chain", 0) > 0 and getattr(w, "chain_range", 0.0) > 0:
-                        self.tesla_chain(e, base_damage=b.damage, chains=w.chain, chain_range=w.chain_range)
+                        self.tesla_chain(e, base_damage=actual, chains=w.chain, chain_range=w.chain_range)
 
 
                     # --- Pierce should apply BEFORE splash kills the bullet ---
@@ -4601,6 +5078,23 @@ class Game:
         draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (text_x, text_y + 84), C_COIN)
 
         self.draw_minimap(map_rect)
+
+        if self.mode == "endless" and self.active_modifiers:
+            remaining = self.modifier_waves_remaining()
+            mod_panel_w = 310
+            line_h = 18
+            mod_panel_h = 36 + line_h * len(self.active_modifiers)
+            mod_x = panel2.x
+            mod_y = panel2.bottom + 10
+            mod_panel = pygame.Rect(mod_x, mod_y, mod_panel_w, mod_panel_h)
+            pygame.draw.rect(self.screen, (*C_PANEL, 215), mod_panel, border_radius=12)
+            pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), mod_panel, 2, border_radius=12)
+            header = f"Modifiers ({remaining}w)"
+            draw_text(self.screen, self.font_small, header, (mod_panel.x + 12, mod_panel.y + 8), C_TEXT, shadow=False)
+            for idx, mod in enumerate(self.active_modifiers):
+                label = clamp_text(self.font_small, mod.name, mod_panel.w - 26)
+                draw_text(self.screen, self.font_small, f"• {label}",
+                          (mod_panel.x + 12, mod_panel.y + 26 + idx * line_h), C_TEXT_DIM, shadow=False)
 
         if self.mode == "story":
             story_w = 620
