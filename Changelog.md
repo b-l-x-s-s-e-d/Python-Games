@@ -167,8 +167,27 @@
 
 ---
 
-## v1.7.1 -- OverLord Balance Changes
+## v1.7.1 -- OverLord Additions and Balance Changes
 
+### New Features
+- Added a special Sky Slam attack for the enraged OverLord
+- Working on modifiers for Endless Mode after a certain wave/time. Current ideas:
+  - **EARLY-LATE MODIFIERS**
+    - Enemies gradually accelerate the longer they stay alive
+    - Enemy spawn locations become less evenly distributed, causing sudden pressure spikes
+    - New enemy that is very, very slow but has Boss-like HP. Named "Knight"
+  - **MID-LATE MODIFIERS**
+    - "Elite" enemies spawn randomly across the map
+    - Enemy spawn waves arrive in tighter clusters rather than spread out
+    - Ranged enemies shoot 2 bullets instead of 1
+    - Knight enemy spawns more frequently
+  - **LATE-LATE MODIFIERS**
+    - Enemies explode on death after a short delay
+    - Enemy projectiles curve slightly toward the player
+    - Nearby enemies heal each other up by 5% every second
+    - Multiple modifiers activate at the same time and stack
+    - "Elite" enemies spawn more frequently
+    - OverLord battle every 3 waves
 ### Improvements
 - Replaced the player's HP display with a bar representing the Beacon's HP (Fully Fixed)
 - Improved visual clarity of the OverLord's bomb drops
@@ -176,6 +195,7 @@
 - Added a 1.3 second windup before the OverLord's dash
 - Significantly increased the OverLord's dash length
 - Increased the OverLord's bomb size and positioned it closer to the player
+- Increased OverLord's attack speed, movement speed, and dash speed. Fires an extra bullet per shot, has reduced dash wind-up time, and faster bomb attacks.
 ### Bug Fixes
 - Fixed a bug where opening the daily wheel would crash the game
 
@@ -186,16 +206,15 @@
 ### New Features
 - Fullscreen mode
 - Kill Streak system rewards damage-free play
-
 ### Improvements
 - Redesign the main menu title and weapon/coins panel
 - Fix Main Menu tabs looking goofy :c
 
 ---
 
-
 ## Urgent Fixes
 -
+
 
 
 
