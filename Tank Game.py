@@ -567,7 +567,8 @@ class SaveManager:
             self.leaderboard = list(data.get("leaderboard", []))
             self.story_unlocked_level = int(data.get("story_unlocked_level", 1))
             self.story_last_level = int(data.get("story_last_level", self.story_unlocked_level))
-            self.last_spin_timestamp = int(data.get("last_spin_timestamp", 0))
+            spin_ts = data.get("last_spin_timestamp", data.get("last_daily_spin_ts", 0))
+            self.last_spin_timestamp = int(spin_ts)
 
             for k in ["meta_damage", "meta_move", "meta_hp", "meta_xp", "meta_dash", "meta_armor", "meta_bulletspeed"]:
                 if k not in self.shop_levels:
@@ -1890,6 +1891,15 @@ class Game:
         self.story_beacon_iframes = 0.0
         self.boss_rocket_strikes: List[Dict[str, object]] = []
         self.minimap_obstacle_cache: List[Tuple[float, float, float, float]] = []
+        self.daily_wheel_angle = 0.0
+        self.daily_wheel_spinning = False
+        self.daily_wheel_spin_time = 0.0
+        self.daily_wheel_spin_duration = 0.0
+        self.daily_wheel_spin_start = 0.0
+        self.daily_wheel_spin_delta = 0.0
+        self.daily_wheel_selected_reward: Optional[Dict[str, object]] = None
+        self.daily_wheel_message = ""
+        self.daily_wheel_message_timer = 0.0
 
         self.arena_rect = pygame.Rect(0, 0, ARENA_W, ARENA_H)
 
@@ -4342,26 +4352,40 @@ class Game:
         line1_y = y + 2
         line2_y = y + 38
 
-        draw_text(self.screen, self.font_ui, "HP", (x, line1_y), C_TEXT)
-        hp = int(self.player.hp)
-        mhp = int(self.player.max_hp)
+        show_beacon_hp = self.mode == "story" and self.story_level_index == 4 and self.beacon_active()
+        if show_beacon_hp:
+            draw_text(self.screen, self.font_ui, "BEACON", (x, line1_y), C_TEXT)
+            bar_w = 260
+            bar_h = 16
+            bx = circle_start_x
+            by = line1_y + 6
+            pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bx, by, bar_w, bar_h), border_radius=6)
+            frac = clamp(self.story_beacon_hp / max(1, self.story_beacon_max), 0, 1)
+            pygame.draw.rect(self.screen, (255, 180, 120), pygame.Rect(bx, by, int(bar_w * frac), bar_h), border_radius=6)
+            pygame.draw.rect(self.screen, (255, 200, 150), pygame.Rect(bx, by, bar_w, bar_h), 2, border_radius=6)
+            beacon_value = f"{int(self.story_beacon_hp)}/{int(self.story_beacon_max)}"
+            draw_text(self.screen, self.font_tiny, beacon_value, (bx + bar_w + 8, by - 1), C_TEXT_DIM, shadow=False)
+        else:
+            draw_text(self.screen, self.font_ui, "HP", (x, line1_y), C_TEXT)
+            hp = int(self.player.hp)
+            mhp = int(self.player.max_hp)
 
-        r = 7
-        gap = 6
-        max_per_row = 12
-        cx0 = circle_start_x + r
-        cy0 = line1_y + 10
+            r = 7
+            gap = 6
+            max_per_row = 12
+            cx0 = circle_start_x + r
+            cy0 = line1_y + 10
 
-        for i in range(mhp):
-            row = i // max_per_row
-            col = i % max_per_row
-            px = cx0 + col * (r * 2 + gap)
-            py = cy0 + row * (r * 2 + 6)
+            for i in range(mhp):
+                row = i // max_per_row
+                col = i % max_per_row
+                px = cx0 + col * (r * 2 + gap)
+                py = cy0 + row * (r * 2 + 6)
 
-            filled = i < hp
-            if filled:
-                pygame.draw.circle(self.screen, C_HEALTH, (px, py), r)
-            circle_outline(self.screen, (255, 160, 190), (px, py), r + 2, 2)
+                filled = i < hp
+                if filled:
+                    pygame.draw.circle(self.screen, C_HEALTH, (px, py), r)
+                circle_outline(self.screen, (255, 160, 190), (px, py), r + 2, 2)
 
         draw_text(self.screen, self.font_ui, f"LVL {self.player.level}", (x, line2_y), C_TEXT)
         bx2 = circle_start_x
@@ -4389,40 +4413,32 @@ class Game:
 
         draw_text(self.screen, self.font_ui, f"Score: {self.player.score}", (text_x, text_y), C_TEXT)
         draw_text(self.screen, self.font_ui, f"Wave: {self.wave}", (text_x, text_y + 28), C_TEXT)
-        if self.mode == "story" and self.story_level_index == 4 and self.beacon_active():
-            draw_text(self.screen, self.font_ui, "BEACON", (text_x, text_y + 52), C_TEXT)
-            bar_w = 150
-            bar_h = 10
-            bx = text_x + 92
-            by = text_y + 56
-            pygame.draw.rect(self.screen, (10, 10, 12), pygame.Rect(bx, by, bar_w, bar_h), border_radius=6)
-            frac = clamp(self.story_beacon_hp / max(1, self.story_beacon_max), 0, 1)
-            pygame.draw.rect(self.screen, (255, 180, 120), pygame.Rect(bx, by, int(bar_w * frac), bar_h), border_radius=6)
-            pygame.draw.rect(self.screen, (255, 200, 150), pygame.Rect(bx, by, bar_w, bar_h), 2, border_radius=6)
-            beacon_value = f"{int(self.story_beacon_hp)}/{int(self.story_beacon_max)}"
-            draw_text(self.screen, self.font_tiny, beacon_value, (bx + bar_w + 8, by - 1), C_TEXT_DIM, shadow=False)
-        else:
-            draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (text_x, text_y + 56), C_TEXT)
+        draw_text(self.screen, self.font_ui, f"Time: {int(self.survival_time)}s", (text_x, text_y + 56), C_TEXT)
         draw_text(self.screen, self.font_ui, f"Coins: {self.save.coins}", (text_x, text_y + 84), C_COIN)
 
         self.draw_minimap(map_rect)
 
         if self.mode == "story":
             story_w = 620
-            story_h = 54
+            base_story_h = 46
+            padding = 10
             story_x = WIDTH // 2 - story_w // 2
-            top_hud_bottom = max(panel.bottom, panel2.bottom) + 2
-            story_y = top_hud_bottom
-            max_h = max(44, HEIGHT - story_y - 12)
-            story_h = min(story_h, max_h)
+            top_hud_bottom = max(panel.bottom, panel2.bottom)
+            available = HEIGHT - top_hud_bottom - 12
+            story_h = min(base_story_h, max(40, available - padding))
+            if available < story_h + padding:
+                padding = max(8, available - story_h)
+            story_y = top_hud_bottom + padding
             story_panel = pygame.Rect(story_x, story_y, story_w, story_h)
             pygame.draw.rect(self.screen, (*C_PANEL, 215), story_panel, border_radius=12)
             pygame.draw.rect(self.screen, (*C_WALL_EDGE, 200), story_panel, 2, border_radius=12)
             level_label = f"STORY LEVEL {self.story_level_index}: {self.story_config.get('name', '') if self.story_config else ''}"
             obj_label = self.story_objective_progress_text()
-            draw_text(self.screen, self.font_small, level_label, (story_panel.centerx, story_panel.y + 8),
+            level_y = story_panel.y + 6
+            obj_y = story_panel.y + story_panel.h - 22
+            draw_text(self.screen, self.font_small, level_label, (story_panel.centerx, level_y),
                       C_ACCENT, center=True, shadow=False)
-            draw_text(self.screen, self.font_small, obj_label, (story_panel.centerx, story_panel.y + 30),
+            draw_text(self.screen, self.font_small, obj_label, (story_panel.centerx, obj_y),
                       C_TEXT, center=True, shadow=False)
 
         boss = self._get_boss()
