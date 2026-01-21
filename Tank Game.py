@@ -1266,20 +1266,44 @@ class Dasher(EnemyBase):
 
 class Boss(EnemyBase):
     """Big slow boss. Spawns every N waves. No normal spawns while alive."""
+    MIN_SHOOT_CD = 0.75
+    ENRAGED_ATTACK_SPEED_MULT = 0.8
+    ENRAGED_MOVE_SPEED_MULT = 1.2
+    ENRAGED_DASH_SPEED_MULT = 1.3
+    ENRAGED_DASH_WINDUP = 0.8
+    ENRAGED_VOLLEY_BONUS = 1
+    ENRAGED_ROCKET_REACTION_REDUCTION = 0.3
+    ENRAGED_ROCKET_RADIUS_MULT = 1.7
+    SKY_SLAM_COOLDOWN_RANGE = (10.0, 13.0)
+    SKY_SLAM_TAKEOFF_TIME = 0.7
+    SKY_SLAM_HOVER_TIME = 3.0
+    SKY_SLAM_RECOVERY_TIME = 0.5
+    SKY_SLAM_MARKER_DELAY = 0.5
+    SKY_SLAM_DAMAGE = 3
+    SKY_SLAM_SCALE_MIN = 0.2
+    SKY_SLAM_BUFFER_EXTRA = 0.6
+
     def __init__(self, pos, hp, speed, wave_index: int):
         super().__init__(pos, hp, speed, radius=36, color=C_BOSS)
         self.damage_contact = 1
+        self.base_damage_contact = 1
         self.score_value = 300 + wave_index * 25
         self.wave_index = wave_index
-        self.shoot_cd = 1.4
-        self.shoot_cd_base = 1.4
-        self.volley = 3
+        self.base_shoot_cd = 1.4
+        self.shoot_cd = self.base_shoot_cd
+        self.shoot_cd_base = self.base_shoot_cd
+        self.base_volley = 3
+        self.volley = self.base_volley
         self.volley_spread = 12.0
         self.bullet_speed = 270.0
         self.bullet_damage = 1 + max(0, (wave_index // 10) - 1) * 2 # Boss damage
         self.bullet_life = 1.5
         self.enraged = False
+        self.base_speed = speed
         # Story boss specials (Level 6 only).
+        self.base_dash_speed = 920.0
+        self.dash_distance = 420.0
+        self.base_dash_windup = 1.3
         self.dash_cd = random.uniform(4.0, 6.0)
         self.dash_windup = 0.0
         self.dash_timer = 0.0
@@ -1287,25 +1311,60 @@ class Boss(EnemyBase):
         self.dash_target = Vector2(self.pos)
         self.dash_hit = False
         self.rocket_cd = random.uniform(5.0, 7.0)
+        self.base_rocket_telegraph = 0.7
+        self.base_rocket_fall = 0.35
+        self.base_rocket_reaction = self.base_rocket_telegraph + self.base_rocket_fall
+        self.base_rocket_radius = 90.0
+        self.sky_slam_cd = random.uniform(*self.SKY_SLAM_COOLDOWN_RANGE)
+        self.sky_slam_active = False
+        self.sky_slam_phase = "idle"
+        self.sky_slam_timer = 0.0
+        self.sky_slam_recovery = 0.0
+        self.sky_slam_scale = 1.0
+        self.sky_slam_marker_pos = Vector2(self.pos)
+        self.sky_slam_marker_radius = 180.0
+        self.sky_slam_buffer: List[Dict[str, object]] = []
+        self.sky_slam_impact_timer = 0.0
+        self.sky_slam_impact_total = 0.45
+        self.sky_slam_impact_pos = Vector2(self.pos)
 
     def take_damage(self, dmg: int, knock_dir: Vector2, knockback: float, weapon_id: Optional[str] = None, from_player: bool = False):
         # Boss has knockback resistance
+        if self.sky_slam_active and self.sky_slam_phase in ("takeoff", "hover"):
+            return
         super().take_damage(dmg, knock_dir, knockback * 0.35, weapon_id=weapon_id, from_player=from_player)
 
     def update(self, dt, game):
-        # Enrage at low HP: shoots faster
+        # Enrage at low HP
         if (not self.enraged) and self.hp < self.hp_max * 0.35:
             self.enraged = True
-            self.shoot_cd_base = max(0.75, self.shoot_cd_base * 0.72)
-            self.volley = 4
+
+        enraged_mult = 1.0 if not self.enraged else self.ENRAGED_ATTACK_SPEED_MULT
+        self.shoot_cd_base = max(self.MIN_SHOOT_CD, self.base_shoot_cd * enraged_mult)
+        self.volley = self.base_volley + (self.ENRAGED_VOLLEY_BONUS if self.enraged else 0)
+        self.speed = self.base_speed * (self.ENRAGED_MOVE_SPEED_MULT if self.enraged else 1.0)
+        dash_speed = self.base_dash_speed * (self.ENRAGED_DASH_SPEED_MULT if self.enraged else 1.0)
+        dash_windup_time = self.ENRAGED_DASH_WINDUP if self.enraged else self.base_dash_windup
+        reaction_reduction = self.ENRAGED_ROCKET_REACTION_REDUCTION if self.enraged else 0.0
+        rocket_reaction = max(0.0, self.base_rocket_reaction - reaction_reduction)
+        rocket_radius = self.base_rocket_radius * (self.ENRAGED_ROCKET_RADIUS_MULT if self.enraged else 1.0)
+        rocket_telegraph = max(0.0, rocket_reaction - self.base_rocket_fall)
+
+        if self.sky_slam_active:
+            self._update_sky_slam(dt, game)
+            return
+
+        if self.enraged and game.boss_specials_active():
+            self.sky_slam_cd = max(0.0, self.sky_slam_cd - dt)
+            if self.sky_slam_cd <= 0 and self.dash_windup <= 0 and self.dash_timer <= 0:
+                self._start_sky_slam(game)
+                return
 
         self.shoot_cd -= dt
 
         if game.boss_specials_active():
             # Dash attack: visible wind-up, then lunge toward the player.
-            dash_speed = 920.0
-            dash_distance = 420.0
-            dash_duration = dash_distance / dash_speed
+            dash_duration = self.dash_distance / dash_speed
             self.dash_cd -= dt
             if self.dash_windup > 0:
                 self.dash_windup -= dt
@@ -1344,18 +1403,23 @@ class Boss(EnemyBase):
                 self.dash_timer -= step
             elif self.dash_cd <= 0:
                 self.dash_cd = random.uniform(4.0, 6.0)
-                # Dash timing: lock direction and target, then wait 1.3s before moving.
-                self.dash_windup = 1.3
+                # Dash timing: lock direction and target, then wait briefly before moving.
+                self.dash_windup = dash_windup_time
                 d = game.player.pos - self.pos
                 self.dash_dir = d.normalize() if d.length_squared() > 0.001 else Vector2(1, 0)
-                self.dash_target = self.pos + self.dash_dir * dash_distance
+                self.dash_target = self.pos + self.dash_dir * self.dash_distance
 
             # Rocket strike: mark ground, then drop and explode.
             self.rocket_cd -= dt
             if self.rocket_cd <= 0:
                 self.rocket_cd = random.uniform(5.0, 7.0)
                 jitter = Vector2(random.uniform(-120, 120), random.uniform(-120, 120))
-                game.spawn_boss_rocket_strike(game.player.pos + jitter)
+                game.spawn_boss_rocket_strike(
+                    game.player.pos + jitter,
+                    telegraph_time=rocket_telegraph,
+                    fall_time=self.base_rocket_fall,
+                    radius=rocket_radius,
+                )
             if self.dash_windup > 0 or self.dash_timer > 0:
                 return
 
@@ -1403,25 +1467,127 @@ class Boss(EnemyBase):
             self.shoot_cd = self.shoot_cd_base + random.uniform(-0.12, 0.18)
 
     def draw(self, surf, cam):
+        if self.sky_slam_phase == "hover":
+            self._draw_sky_slam_marker(surf, cam)
+        if self.sky_slam_impact_timer > 0:
+            self._draw_sky_slam_impact(surf, cam)
+
+        draw_radius = max(1, int(self.radius * self.sky_slam_scale))
         p = (int(self.pos.x - cam.x), int(self.pos.y - cam.y))
         col = (255, 255, 255) if self.hit_flash > 0 else self.color
-        pygame.draw.circle(surf, col, p, self.radius)
-        circle_outline(surf, C_BOSS_EDGE, p, self.radius + 5, 3)
-        circle_outline(surf, (25, 25, 35), p, self.radius + 10, 2)
-        if self.dash_windup > 0:
+        pygame.draw.circle(surf, col, p, draw_radius)
+        circle_outline(surf, C_BOSS_EDGE, p, draw_radius + 5, 3)
+        circle_outline(surf, (25, 25, 35), p, draw_radius + 10, 2)
+        if self.dash_windup > 0 and not self.sky_slam_active:
             # Telegraph the dash with a line toward the target.
             t = (int(self.dash_target.x - cam.x), int(self.dash_target.y - cam.y))
             pygame.draw.line(surf, (255, 150, 110), p, t, 3)
-            circle_outline(surf, (255, 180, 140), p, self.radius + 14, 2)
+            circle_outline(surf, (255, 180, 140), p, draw_radius + 14, 2)
 
         # tiny hp bar over head
-        w = self.radius * 2 + 30
+        w = draw_radius * 2 + 30
         h = 7
         x = p[0] - w // 2
-        y = p[1] - self.radius - 16
+        y = p[1] - draw_radius - 16
         frac = clamp(self.hp / max(1.0, self.hp_max), 0, 1)
         pygame.draw.rect(surf, (10, 10, 12), pygame.Rect(x, y, w, h))
         pygame.draw.rect(surf, (255, 120, 140), pygame.Rect(x, y, int(w * frac), h))
+
+    def _start_sky_slam(self, game):
+        # Enraged-only special: briefly take off, track the player, then slam down.
+        self.sky_slam_active = True
+        self.sky_slam_phase = "takeoff"
+        self.sky_slam_timer = self.SKY_SLAM_TAKEOFF_TIME
+        self.sky_slam_recovery = 0.0
+        self.sky_slam_scale = 1.0
+        self.sky_slam_buffer.clear()
+        self.sky_slam_marker_pos = Vector2(game.player.pos)
+        self.damage_contact = 0
+        self.vel *= 0
+        self.dash_windup = 0.0
+        self.dash_timer = 0.0
+        self.shoot_cd = self.shoot_cd_base
+
+    def _update_sky_slam(self, dt, game):
+        self.vel *= 0
+        self._record_sky_slam_target(dt, game)
+        if self.sky_slam_phase == "takeoff":
+            self.sky_slam_timer -= dt
+            progress = clamp(1.0 - (self.sky_slam_timer / self.SKY_SLAM_TAKEOFF_TIME), 0.0, 1.0)
+            self.sky_slam_scale = lerp(1.0, self.SKY_SLAM_SCALE_MIN, progress)
+            if self.sky_slam_timer <= 0:
+                self.sky_slam_phase = "hover"
+                self.sky_slam_timer = self.SKY_SLAM_HOVER_TIME
+        elif self.sky_slam_phase == "hover":
+            self.sky_slam_timer -= dt
+            self.sky_slam_marker_pos = Vector2(self._get_delayed_sky_slam_target())
+            self.sky_slam_scale = self.SKY_SLAM_SCALE_MIN
+            if self.sky_slam_timer <= 0:
+                self._slam_down(game)
+        elif self.sky_slam_phase == "impact":
+            self.sky_slam_impact_timer = max(0.0, self.sky_slam_impact_timer - dt)
+            self.sky_slam_recovery = max(0.0, self.sky_slam_recovery - dt)
+            if self.sky_slam_recovery <= 0:
+                self._end_sky_slam()
+
+    def _slam_down(self, game):
+        self.sky_slam_phase = "impact"
+        self.sky_slam_scale = 1.0
+        self.pos = Vector2(self.sky_slam_marker_pos)
+        self.damage_contact = self.base_damage_contact
+        self.sky_slam_recovery = self.SKY_SLAM_RECOVERY_TIME
+        self.sky_slam_impact_timer = self.sky_slam_impact_total
+        self.sky_slam_impact_pos = Vector2(self.sky_slam_marker_pos)
+        d2 = (game.player.pos - self.sky_slam_marker_pos).length_squared()
+        if d2 <= self.sky_slam_marker_radius ** 2:
+            game.damage_player(self.SKY_SLAM_DAMAGE)
+        game.shake = max(game.shake, 16.0)
+
+    def _end_sky_slam(self):
+        self.sky_slam_active = False
+        self.sky_slam_phase = "idle"
+        self.sky_slam_scale = 1.0
+        self.sky_slam_cd = random.uniform(*self.SKY_SLAM_COOLDOWN_RANGE)
+
+    def _record_sky_slam_target(self, dt, game):
+        self.sky_slam_buffer.append({"pos": Vector2(game.player.pos), "age": 0.0})
+        for entry in self.sky_slam_buffer:
+            entry["age"] = float(entry["age"]) + dt
+        trim_after = self.SKY_SLAM_MARKER_DELAY + self.SKY_SLAM_BUFFER_EXTRA
+        while self.sky_slam_buffer and float(self.sky_slam_buffer[0]["age"]) > trim_after:
+            self.sky_slam_buffer.pop(0)
+
+    def _get_delayed_sky_slam_target(self) -> Vector2:
+        target = None
+        for entry in self.sky_slam_buffer:
+            if float(entry["age"]) >= self.SKY_SLAM_MARKER_DELAY:
+                target = entry["pos"]
+                break
+        if target is None and self.sky_slam_buffer:
+            target = self.sky_slam_buffer[0]["pos"]
+        return Vector2(target) if target is not None else Vector2(self.pos)
+
+    def _draw_sky_slam_marker(self, surf, cam):
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pos = self.sky_slam_marker_pos
+        screen = (int(pos.x - cam.x), int(pos.y - cam.y))
+        radius = int(self.sky_slam_marker_radius)
+        pygame.draw.circle(overlay, (255, 120, 140, 60), screen, radius)
+        pygame.draw.circle(overlay, (255, 170, 190, 200), screen, radius, 3)
+        pygame.draw.line(overlay, (255, 170, 190, 220), (screen[0] - radius, screen[1]), (screen[0] + radius, screen[1]), 3)
+        pygame.draw.line(overlay, (255, 170, 190, 220), (screen[0], screen[1] - radius), (screen[0], screen[1] + radius), 3)
+        surf.blit(overlay, (0, 0))
+
+    def _draw_sky_slam_impact(self, surf, cam):
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        progress = clamp(1.0 - (self.sky_slam_impact_timer / self.sky_slam_impact_total), 0.0, 1.0)
+        radius = int(self.sky_slam_marker_radius * (0.7 + 0.6 * progress))
+        alpha = int(200 * (1.0 - progress))
+        pos = self.sky_slam_impact_pos
+        screen = (int(pos.x - cam.x), int(pos.y - cam.y))
+        pygame.draw.circle(overlay, (255, 220, 230, alpha), screen, max(1, radius), 4)
+        pygame.draw.circle(overlay, (255, 180, 200, int(alpha * 0.6)), screen, max(1, int(radius * 0.6)), 2)
+        surf.blit(overlay, (0, 0))
 
 
 # =========================================================
@@ -2511,13 +2677,15 @@ class Game:
         self.story_beacon_hp = max(0, int(self.story_beacon_hp) - int(amount))
         self.story_beacon_iframes = 0.55  # brief grace so it doesn't melt instantly
 
-    def spawn_boss_rocket_strike(self, pos: Vector2):
+    def spawn_boss_rocket_strike(self, pos: Vector2, telegraph_time: float = 0.7, fall_time: float = 0.35, radius: float = 90.0):
         # Boss special: telegraphed rocket strike.
         self.boss_rocket_strikes.append({
             "pos": Vector2(pos),
             "state": "telegraph",
-            "timer": 0.7,
-            "radius": 90,
+            "timer": telegraph_time,
+            "telegraph_time": telegraph_time,
+            "fall_time": fall_time,
+            "radius": radius,
         })
 
     def update_boss_rocket_strikes(self, dt: float):
@@ -2527,7 +2695,7 @@ class Game:
             strike["timer"] -= dt
             if strike["state"] == "telegraph" and strike["timer"] <= 0:
                 strike["state"] = "fall"
-                strike["timer"] = 0.35
+                strike["timer"] = float(strike.get("fall_time", 0.35))
                 strike["fall_total"] = strike["timer"]
             elif strike["state"] == "fall" and strike["timer"] <= 0:
                 strike["state"] = "explode"
