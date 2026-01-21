@@ -1302,18 +1302,36 @@ class Boss(EnemyBase):
         self.shoot_cd -= dt
 
         if game.boss_specials_active():
-            # Dash attack: short windup, then lunge toward the player.
+            # Dash attack: visible wind-up, then lunge toward the player.
+            dash_speed = 920.0
+            dash_distance = 820.0
+            dash_duration = dash_distance / dash_speed
             self.dash_cd -= dt
             if self.dash_windup > 0:
                 self.dash_windup -= dt
-                self.pos += self.vel * dt
-                game.resolve_circle_walls(self, damping=0.12)
+                # Hold position during the wind-up so the telegraph is clear.
+                self.vel *= 0
                 if self.dash_windup <= 0:
-                    self.dash_timer = 0.25
+                    self.dash_timer = dash_duration
                     self.dash_hit = False
+                    # Begin the dash immediately after wind-up using any leftover time slice.
+                    dash_dt = -self.dash_windup
+                    if dash_dt > 0:
+                        step = min(dash_dt, self.dash_timer)
+                        self.pos += self.dash_dir * dash_speed * step
+                        game.resolve_circle_walls(self, damping=0.12)
+                        if not self.dash_hit:
+                            rr = (self.radius + PLAYER_RADIUS) ** 2
+                            if (game.player.pos - self.pos).length_squared() <= rr:
+                                self.dash_hit = True
+                                game.damage_player(2)
+                                knock = (game.player.pos - self.pos)
+                                if knock.length_squared() > 0.001:
+                                    game.player.vel += knock.normalize() * 420
+                        self.dash_timer -= step
             elif self.dash_timer > 0:
-                dash_speed = 920.0
-                self.pos += self.dash_dir * dash_speed * dt
+                step = min(dt, self.dash_timer)
+                self.pos += self.dash_dir * dash_speed * step
                 game.resolve_circle_walls(self, damping=0.12)
                 if not self.dash_hit:
                     rr = (self.radius + PLAYER_RADIUS) ** 2
@@ -1323,13 +1341,14 @@ class Boss(EnemyBase):
                         knock = (game.player.pos - self.pos)
                         if knock.length_squared() > 0.001:
                             game.player.vel += knock.normalize() * 420
-                self.dash_timer -= dt
+                self.dash_timer -= step
             elif self.dash_cd <= 0:
                 self.dash_cd = random.uniform(4.0, 6.0)
-                self.dash_windup = 0.35
+                # Dash timing: lock direction and target, then wait 1.3s before moving.
+                self.dash_windup = 1.3
                 d = game.player.pos - self.pos
                 self.dash_dir = d.normalize() if d.length_squared() > 0.001 else Vector2(1, 0)
-                self.dash_target = Vector2(game.player.pos)
+                self.dash_target = self.pos + self.dash_dir * dash_distance
 
             # Rocket strike: mark ground, then drop and explode.
             self.rocket_cd -= dt
@@ -2509,6 +2528,7 @@ class Game:
             if strike["state"] == "telegraph" and strike["timer"] <= 0:
                 strike["state"] = "fall"
                 strike["timer"] = 0.35
+                strike["fall_total"] = strike["timer"]
             elif strike["state"] == "fall" and strike["timer"] <= 0:
                 strike["state"] = "explode"
                 strike["timer"] = 0.22
@@ -2536,13 +2556,21 @@ class Game:
                 pygame.draw.circle(overlay, (255, 90, 110, 70), screen, radius, 0)
                 pygame.draw.circle(overlay, (255, 120, 140, 170), screen, radius, 2)
             elif strike["state"] == "fall":
+                fall_total = float(strike.get("fall_total", 0.35))
+                time_left = max(0.0, float(strike["timer"]))
+                imminent = clamp(1.0 - (time_left / fall_total), 0.0, 1.0)
+                pulse_t = pygame.time.get_ticks() / 1000.0
+                pulse = 0.5 + 0.5 * math.sin(pulse_t * 10.0 + imminent * 3.0)
+                pulse_alpha = int(120 + 100 * pulse * (0.4 + 0.6 * imminent))
+                pulse_radius = int(radius + 8 + 12 * pulse * (0.4 + 0.6 * imminent))
                 top = (screen[0], screen[1] - 120)
                 pygame.draw.line(overlay, (255, 130, 150, 200), top, screen, 4)
                 pygame.draw.polygon(overlay, (255, 130, 150, 220),
                                     [(screen[0] - 10, screen[1] - 10),
                                      (screen[0] + 10, screen[1] - 10),
                                      (screen[0], screen[1] + 12)])
-                pygame.draw.circle(overlay, (255, 120, 140, 180), screen, radius, 2)
+                pygame.draw.circle(overlay, (255, 120, 140, 200), screen, radius + 6, 3)
+                pygame.draw.circle(overlay, (255, 150, 170, pulse_alpha), screen, pulse_radius, 4)
             else:
                 pygame.draw.circle(overlay, (255, 120, 140, 140), screen, radius, 0)
                 pygame.draw.circle(overlay, (255, 160, 180, 220), screen, radius, 2)
