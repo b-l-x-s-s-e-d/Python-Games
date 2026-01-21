@@ -1304,7 +1304,7 @@ class Boss(EnemyBase):
         if game.boss_specials_active():
             # Dash attack: visible wind-up, then lunge toward the player.
             dash_speed = 920.0
-            dash_distance = 820.0
+            dash_distance = 420.0
             dash_duration = dash_distance / dash_speed
             self.dash_cd -= dt
             if self.dash_windup > 0:
@@ -5694,3 +5694,4 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
