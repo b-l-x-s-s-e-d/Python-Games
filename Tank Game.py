@@ -1,16 +1,4 @@
 # main.py
-# Tank Game — single-file top-down survival shooter (Pygame)
-# Asset-free: all visuals are shapes; audio is optional and fallback-safe.
-#
-# CHANGES (this pass):
-# ✅ Added Story Mode with 6 config-driven levels, progression, and HUD objectives.
-# ✅ Story progress is saved alongside existing save data (new keys only).
-#
-# STORY MODE NOTES:
-# - Access: Main Menu → Story Mode (button under Start Run). Use Continue or select a level.
-# - Level configs: See LEVELS list (name, objective, win condition, arena, spawn, enemy weights, and special rules).
-# - Implemented twists: tighter arenas, ranged-heavy ambush, low-visibility "night" run,
-#   defend-the-beacon objective, hazard zones, and a boss finale.
 
 import os
 import sys
