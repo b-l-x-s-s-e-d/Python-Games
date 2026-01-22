@@ -187,33 +187,33 @@
 
 ### New Features
 - Added Modifiers for late game in Endless Mode:
-**EARLY-LATE MODIFIERS (Wave 20–25)**
-- Enemies gradually accelerate the longer they stay alive
-- Enemy spawn locations become uneven, causing pressure spikes
-- New enemy: Knight — extremely slow, Boss-like HP
-- Enemies gain slight resistance over time
-- Increased enemy turning speed
-- Delayed spawn bursts instead of smooth spawning
+  - **EARLY-LATE MODIFIERS (Wave 20–25)**
+    - Enemies gradually accelerate the longer they stay alive
+    - Enemy spawn locations become uneven, causing pressure spikes
+    - New enemy: Knight — extremely slow, Boss-like HP
+    - Enemies gain slight resistance over time
+    - Increased enemy turning speed
+    - Delayed spawn bursts instead of smooth spawning
 
-**MID-LATE MODIFIERS (Wave 25–35)**
-- Elite enemies spawn randomly across the map
-- Enemy waves spawn in tighter clusters
-- Ranged enemies fire 2 bullets instead of 1
-- Knight enemy spawns more frequently
-- Enemies occasionally dash short distances
-- Elite enemies gain one random stat boost (HP, speed, or damage)
-- Reduced coin drops during active modifier
+  - **MID-LATE MODIFIERS (Wave 25–35)**
+    - Elite enemies spawn randomly across the map
+    - Enemy waves spawn in tighter clusters
+    - Ranged enemies fire 2 bullets instead of 1
+    - Knight enemy spawns more frequently
+    - Enemies occasionally dash short distances
+    - Elite enemies gain one random stat boost (HP, speed, or damage)
+    - Reduced coin drops during active modifier
 
-**LATE-LATE MODIFIERS (Wave 35+)**
-- Enemies explode on death after a short delay
-- Enemy projectiles curve slightly toward the player
-- Nearby enemies heal each other by 5% HP per second
-- Multiple modifiers activate simultaneously and stack
-- Elite enemies spawn much more frequently
-- OverLord battle every 3 waves
-- Enemies revive once after death with reduced HP
-- Enemy bullets persist longer before despawning
-- Global enemy speed ramps continuously during the wave
+  - **LATE-LATE MODIFIERS (Wave 35+)**
+    - Enemies explode on death after a short delay
+    - Enemy projectiles curve slightly toward the player
+    - Nearby enemies heal each other by 5% HP per second
+    - Multiple modifiers activate simultaneously and stack
+    - Elite enemies spawn much more frequently
+    - OverLord battles every 3 waves
+    - Enemies revive once after death with reduced HP
+    - Enemy bullets persist longer before despawning
+    - Global enemy speed ramps continuously during the wave
 
 ---
 
@@ -231,3 +231,4 @@
 ## Urgent Fixes
 
 -
+
