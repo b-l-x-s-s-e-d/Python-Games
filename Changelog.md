@@ -171,23 +171,7 @@
 
 ### New Features
 - Added a special Sky Slam attack for the enraged OverLord
-- Working on modifiers for Endless Mode after a certain wave/time. Current ideas:
-  - **EARLY-LATE MODIFIERS**
-    - Enemies gradually accelerate the longer they stay alive
-    - Enemy spawn locations become less evenly distributed, causing sudden pressure spikes
-    - New enemy that is very, very slow but has Boss-like HP. Named "Knight"
-  - **MID-LATE MODIFIERS**
-    - "Elite" enemies spawn randomly across the map
-    - Enemy spawn waves arrive in tighter clusters rather than spread out
-    - Ranged enemies shoot 2 bullets instead of 1
-    - Knight enemy spawns more frequently
-  - **LATE-LATE MODIFIERS**
-    - Enemies explode on death after a short delay
-    - Enemy projectiles curve slightly toward the player
-    - Nearby enemies heal each other up by 5% every second
-    - Multiple modifiers activate at the same time and stack
-    - "Elite" enemies spawn more frequently
-    - OverLord battle every 3 waves
+- Working on modifiers for Endless Mode after a certain wave/time
 ### Improvements
 - Replaced the player's HP display with a bar representing the Beacon's HP (Fully Fixed)
 - Improved visual clarity of the OverLord's bomb drops
@@ -198,6 +182,38 @@
 - Increased OverLord's attack speed, movement speed, and dash speed. Fires an extra bullet per shot, has reduced dash wind-up time, and faster bomb attacks.
 ### Bug Fixes
 - Fixed a bug where opening the daily wheel would crash the game
+
+## v1.7.2 -- Late Game Additions
+
+### New Features
+- Added Modifiers for late game in Endless Mode:
+**EARLY-LATE MODIFIERS (Wave 20–25)**
+- Enemies gradually accelerate the longer they stay alive
+- Enemy spawn locations become uneven, causing pressure spikes
+- New enemy: Knight — extremely slow, Boss-like HP
+- Enemies gain slight resistance over time
+- Increased enemy turning speed
+- Delayed spawn bursts instead of smooth spawning
+
+**MID-LATE MODIFIERS (Wave 25–35)**
+- Elite enemies spawn randomly across the map
+- Enemy waves spawn in tighter clusters
+- Ranged enemies fire 2 bullets instead of 1
+- Knight enemy spawns more frequently
+- Enemies occasionally dash short distances
+- Elite enemies gain one random stat boost (HP, speed, or damage)
+- Reduced coin drops during active modifier
+
+**LATE-LATE MODIFIERS (Wave 35+)**
+- Enemies explode on death after a short delay
+- Enemy projectiles curve slightly toward the player
+- Nearby enemies heal each other by 5% HP per second
+- Multiple modifiers activate simultaneously and stack
+- Elite enemies spawn much more frequently
+- OverLord battle every 3 waves
+- Enemies revive once after death with reduced HP
+- Enemy bullets persist longer before despawning
+- Global enemy speed ramps continuously during the wave
 
 ---
 
@@ -213,4 +229,5 @@
 ---
 
 ## Urgent Fixes
+
 -
