@@ -217,6 +217,16 @@
 
 ---
 
+## v1.7.3
+
+### New Features
+- Added a "Seeker" Tank whose bullets slightly home towards enemies
+
+### Improvements
+- Turned the triangle in the daily wheel tab 180 degrees
+
+---
+
 ## To-Do Features
 
 ### New Features
@@ -231,4 +241,5 @@
 ## Urgent Fixes
 
 -
+
 
