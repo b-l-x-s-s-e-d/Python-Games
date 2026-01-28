@@ -220,7 +220,7 @@
 ## v1.7.3
 
 ### New Features
-- Added a "Seeker" Tank whose bullets slightly home towards enemies
+- Added a "Final Boss" Tank whose bullets do extremely massive damage with a massive splash radius. But very slow bullet speed
 
 ### Improvements
 - Turned the triangle in the daily wheel tab 180 degrees
@@ -241,5 +241,6 @@
 ## Urgent Fixes
 
 -
+
 
 
