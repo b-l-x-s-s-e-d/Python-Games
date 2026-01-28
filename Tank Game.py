@@ -18,7 +18,7 @@ from pygame.math import Vector2
 # SETTINGS / CONSTANTS
 # =========================================================
 WIDTH, HEIGHT = 1100, 650
-TITLE = "Tank Game v1.4"
+TITLE = "Tank Game v1.7.3"
 FPS_CAP = 144
 
 RECOIL_MULT = 1.0 # Default = 1       (Recoil multiplier)
@@ -1063,6 +1063,18 @@ WEAPONS: Dict[str, WeaponDef] = {
         recoil=150.0,
         splash_radius=150,
     ),
+        "final_boss": WeaponDef(
+        id="final_boss",
+        name="Final Boss",
+        desc="Final Boss",
+        base_damage=150,
+        fire_cd=4,       
+        bullet_speed=250.0,
+        bullet_life=0.7,
+        bullet_radius=10,
+        recoil=300,
+        splash_radius=300,
+    ),
 }
 
 
@@ -1829,6 +1841,8 @@ SHOP_ITEMS = [
     ShopItemDef("unlock_electricity", "Unlock: Electricity", "Chains many enemies", 1, 400, 1.0, "weapon", weapon_id="electricity"),
     ShopItemDef("unlock_windscreen_wiper", "Unlock: Windscreen Wiper", "Wipes the map clean...", 1, math.inf, 1.0, "weapon", weapon_id="windscreen"),
     ShopItemDef("unlock_tank", "Unlock: Tank", "Insane damage but very slow", 1, 390, 1.0, "weapon", weapon_id="tank"),
+    ShopItemDef("unlock_final_boss", "Unlock: Final Boss", "Final Boss", 1, 1000, 1.0, "weapon", weapon_id="final_boss"),
+
 ]
 
 SHOP_ITEMS_BY_ID = {item.id: item for item in SHOP_ITEMS}
@@ -6344,5 +6358,4 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
-
 
