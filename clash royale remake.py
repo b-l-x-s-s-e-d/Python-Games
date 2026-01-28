@@ -1,475 +1,63 @@
 """
-CLASH ROYALE 1:1 PYTHON REMAKE — FULL MASTER PROMPT (TXT)
+Clash Royale 1:1 Python Remake (Educational)
 
-This single file contains the complete architecture plan, protocol spec,
-schemas, roadmap, and a runnable skeleton reference (as code blocks) as
-requested. It is intentionally data-first, deterministic-first, and
-server-authoritative in design. Placeholder values are clearly labeled and
-intended to be replaced via data tables without code changes.
+Single-file, runnable prototype that operationalizes the prior master plan.
+Constraints honored:
+- Python 3.12+
+- Pygame rendering + pygame.mixer hooks
+- Deterministic 20 TPS simulation with 60 FPS rendering
+- Data-first card definitions (inline JSON for this single-file constraint)
 
-NOTE: The deliverables below are organized in the exact required order.
+This is a minimal playable prototype that demonstrates:
+- Arena rendering (two lanes + river + bridges)
+- Placeholder towers for each side
+- One troop card with elixir ticking
+- Deterministic fixed-step sim loop
+- Validated placement and server-authoritative logic (single-process for now)
+
+Controls
+- Left click to place a troop on your side (bottom half)
+- Esc or window close to exit
 """
 
 from __future__ import annotations
 
+import json
+import math
+import random
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-# =====================================================================
-# A) ARCHITECTURE
-# =====================================================================
-ARCHITECTURE = """
-A) ARCHITECTURE
-
-Component Diagram (textual)
-
-[Client]
-  - client.main
-  - ui.basic_ui
-  - network.client_ws
-  - engine.sim (shared)
-  - engine.entities
-  - engine.pathfinding
-  - assets/audio
-
-[Server]
-  - server.main
-  - network.server_ws
-  - engine.sim (shared)
-  - engine.entities
-  - engine.pathfinding
-  - progression (profiles, chests, shop)
-
-[Shared]
-  - engine.sim (deterministic tick loop)
-  - engine.entities (entity model, combat)
-  - engine.pathfinding (A* grid)
-  - cards.card_defs.json (data-driven stats)
-  - arenas/*.json (tile grids, spawn points)
-  - replays (input logs + checksums)
-
-Responsibilities
-- engine.sim: authoritative fixed-timestep simulation at 20 TPS. Processes input,
-  validates, updates entities, resolves combat, produces state snapshots.
-- engine.entities: Entity/Troop/Building/Spell/Tower/Projectile/StatusEffect
-  definitions + combat rules (data-driven).
-- engine.pathfinding: A* grid pathing, dynamic obstacle updates, bridge nodes.
-- network.*: WebSocket protocol handling; client inputs, server snapshots.
-- ui.basic_ui: HUD (elixir, hand, timer) + debug overlays.
-- progression: trophies, arenas, cards, shop, chests, JSON persistence.
-- replay: deterministic input recording + checksum verification.
-
-Core Data Models
-- Entity: id, team, position, hp, radius, state flags.
-- Troop(Entity): move_speed, attack, target_type, range, hit_speed, status effects.
-- Building(Entity): lifetime, pull logic, spawn interval.
-- Spell: radius, damage, duration, crown scalar, deploy timing.
-- Tower(Entity): type (king/princess), activation, targeting priority.
-- StatusEffect: type, duration_ticks, magnitude, stacking rules.
-- MatchState: tick, arena_id, entities, players, timer, overtime state.
-- PlayerState: elixir, hand, deck, crowns, input queue.
-
-Update Order per Tick (exact sequence)
-1. Ingest Inputs (server authoritative)
-2. Validate Inputs (placement, elixir, rate limits)
-3. Apply Inputs (spawn entities, consume elixir)
-4. Update Status Effects (ticks, expire, modify stats)
-5. Update Movement (pathing, positions)
-6. Update Targeting (acquire/retarget)
-7. Update Combat (attack cooldowns, spawn projectiles)
-8. Update Projectiles (travel, collision, apply damage)
-9. Resolve Deaths (remove entities, trigger hooks)
-10. Update Timers (elixir regen, overtime, match end)
-11. Emit Snapshot/Delta + Determinism Checksum
-"""
-
-# =====================================================================
-# B) PROTOCOL SPEC (WebSockets chosen)
-# =====================================================================
-PROTOCOL_SPEC = """
-B) PROTOCOL SPEC
-
-Chosen networking: WebSockets
-Justification: reliable ordered delivery is critical for authoritative inputs,
-replay logging, and deterministic reconciliation. WebSockets are simpler for
-local dev and cross-platform clients, with acceptable latency. UDP can be added
-later for production with a reliability layer.
-
-Client -> Server Messages
-1) hello
-  fields: client_version, player_id, auth_token, region, latency_hint_ms
-2) queue_match
-  fields: deck_id, preferred_region, timestamp_ms
-3) input_place_card
-  fields: match_id, tick, card_id, x, y, side, client_seq
-  validation: tick within input buffer window, tile legal, elixir>=cost
-4) input_emote
-  fields: match_id, tick, emote_id, client_seq
-5) ping
-  fields: client_time_ms, seq
-6) request_replay
-  fields: match_id
-7) ack_snapshot
-  fields: match_id, snapshot_seq, last_input_seq
-
-Server -> Client Messages
-1) hello_ack
-  fields: server_version, motd, time_ms
-2) match_found
-  fields: match_id, opponent_id, arena_id, seed, start_tick
-3) state_snapshot
-  fields: match_id, snapshot_seq, tick, entities, players, timers, checksum
-4) state_delta
-  fields: match_id, snapshot_seq, tick, delta, checksum
-5) input_reject
-  fields: match_id, client_seq, reason
-6) match_end
-  fields: match_id, result, crowns, rewards
-7) pong
-  fields: client_time_ms, server_time_ms, seq
-8) replay_data
-  fields: match_id, seed, input_log, checksum_log
-
-Sequencing & Acking
-- Client includes monotonically increasing client_seq on inputs.
-- Server includes snapshot_seq on snapshots; client acked with last_input_seq.
-- Reconciliation uses last acknowledged input; client corrects visual drift.
-
-Timing
-- Server tick: 20 TPS fixed.
-- Client render: 60 FPS; snapshots at 20 TPS, interpolated.
-
-Rate Limits
-- Placement: max 8 inputs per second (burst 2), server-enforced.
-- Emotes: 1 per 2 seconds.
-
-Validation Rules
-- Tile legality, side bounds, elixir availability, cooldowns, timing window.
-- Sanity checks: coordinates within arena bounds.
-"""
-
-# =====================================================================
-# C) DATA SCHEMAS (data-first, placeholders)
-# =====================================================================
-DATA_SCHEMAS = """
-C) DATA SCHEMAS (JSON schema style, placeholders)
-
-cards/card_defs.json schema (example)
-{
-  "cards": [
-    {
-      "id": "string",
-      "name": "string",
-      "rarity": "common|rare|epic|legendary|champion",
-      "type": "troop|building|spell",
-      "elixir_cost": "int",
-      "deploy_time_ticks": "int",
-      "stats": {
-        "hp": "int",
-        "damage": "int",
-        "hit_speed_ticks": "int",
-        "move_speed": "slow|medium|fast",
-        "range": "float",
-        "target_type": "ground|air|both",
-        "splash": "bool",
-        "splash_radius": "float",
-        "mass": "int",
-        "projectile": {
-          "speed": "float",
-          "radius": "float",
-          "travel_time_ticks": "int"
-        }
-      },
-      "abilities": ["string"],
-      "crown_tower_damage_scalar": "float",
-      "level_scaling": {
-        "hp_per_level": "int",
-        "damage_per_level": "int"
-      }
-    }
-  ]
-}
-
-arenas/arena_defs.json schema (example)
-{
-  "arenas": [
-    {
-      "id": "string",
-      "name": "string",
-      "grid_width": "int",
-      "grid_height": "int",
-      "river_rows": ["int"],
-      "bridge_tiles": [["int","int"]],
-      "spawn_points": {
-        "team1": [["int","int"]],
-        "team2": [["int","int"]]
-      },
-      "tower_positions": {
-        "team1": {
-          "king": ["int","int"],
-          "princess": [["int","int"],["int","int"]]
-        },
-        "team2": {
-          "king": ["int","int"],
-          "princess": [["int","int"],["int","int"]]
-        }
-      }
-    }
-  ]
-}
-
-progression config schema
-{
-  "arenas": [{"id": "string", "trophies_min": "int"}],
-  "chests": [{"id": "string", "rarity": "string", "drop_table": "string"}],
-  "shop": [{"id": "string", "offer_type": "string", "price": "int"}]
-}
-
-Drop tables schema
-{
-  "drop_tables": [
-    {
-      "id": "string",
-      "entries": [
-        {"item_id": "string", "weight": "int", "min": "int", "max": "int"}
-      ]
-    }
-  ]
-}
-
-Example entries (placeholder values)
-- Melee troop (Knight-like)
-- Ranged troop (Archer-like)
-- Building puller (Cannon-like)
-- Spell (Fireball-like)
-"""
-
-# =====================================================================
-# D) ROADMAP + MILESTONES
-# =====================================================================
-ROADMAP = """
-D) ROADMAP + MILESTONES
-
-Milestone 0: Repo setup + runnable window + deterministic tick loop
-- Acceptance: window opens; deterministic tick increments at 20 TPS; checksum log
-- QA: tick drift check; headless sim test
-- Perf: 0.5 ms/tick sim budget
-
-Milestone 1: server-client handshake + arena render + towers
-- Acceptance: server hosts match; client connects; arena + towers rendered
-- QA: reconnect test; snapshot integrity
-- Perf: 1 ms/tick sim, 16 ms/frame render
-
-Milestone 2: elixir + hand + deploy 1 troop (authoritative)
-- Acceptance: elixir regenerates; card placement validated; troop spawns
-- QA: invalid placement rejected; elixir not spent on invalid
-- Perf: 2 ms/tick with 10 entities
-
-Milestone 3: targeting + pathfinding + combat + projectiles
-- Acceptance: troop pathing via A*; projectiles hit; towers attack
-- QA: targeting rules; projectile timing; deterministic hashes
-- Perf: 3 ms/tick with 50 entities
-
-Milestone 4: spells + status effects
-- Acceptance: spell damage, radius, effects; status durations in ticks
-- QA: stacking/refresh rules; freeze/slow/stun
-- Perf: 3.5 ms/tick
-
-Milestone 5: full card framework + more cards
-- Acceptance: multiple card types; data-driven stats
-- QA: unit test each card type
-- Perf: 4 ms/tick at 100 entities
-
-Milestone 6: matchmaking + bots + results screen
-- Acceptance: trophy-based matching; bot fallback; results UI
-- QA: bot uses input rules; fairness checks
-- Perf: 4 ms/tick; 16 ms render
-
-Milestone 7: progression + chests + shop + save system
-- Acceptance: persistence, chest timers, shop rotation
-- QA: data migration; encryption at rest
-- Perf: <10 ms save/load
-
-Milestone 8: replays + spectator + anti-cheat hardening
-- Acceptance: replay resim matches checksum; spectator view
-- QA: input sanity; replay verify
-- Perf: replay sim 2x realtime
-
-Milestone 9: polish (UI, audio, animation hooks), perf, QA suite
-- Acceptance: audio hooks, animation timeline, debug overlays
-- QA: full regression suite
-- Perf: stable 60 FPS, <5 ms tick
-"""
-
-# =====================================================================
-# E) MINIMUM WORKING SKELETON CODE (as code blocks)
-# =====================================================================
-SKELETON_CODE = r"""
-E) MINIMUM WORKING SKELETON CODE
-
-/server/main.py
-```python
-import asyncio
-import json
-import websockets
-from engine.sim import Sim
-
-TICK_RATE = 20
-TICK_DT = 1 / TICK_RATE
-
-async def handler(ws):
-    sim = Sim(seed=12345)
-    await ws.send(json.dumps({"type": "hello_ack"}))
-    while True:
-        try:
-            msg = await asyncio.wait_for(ws.recv(), timeout=TICK_DT)
-            sim.enqueue_input(json.loads(msg))
-        except asyncio.TimeoutError:
-            pass
-        sim.tick()
-        snapshot = sim.snapshot()
-        await ws.send(json.dumps({"type": "state_snapshot", "data": snapshot}))
-
-async def main():
-    async with websockets.serve(handler, "0.0.0.0", 8765):
-        await asyncio.Future()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-/client/main.py
-```python
-import asyncio
-import json
-import pygame
-import websockets
-from ui.basic_ui import BasicUI
-
-async def main():
-    pygame.init()
-    screen = pygame.display.set_mode((800, 600))
-    ui = BasicUI()
-    async with websockets.connect("ws://localhost:8765") as ws:
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-            if pygame.time.get_ticks() % 50 == 0:
-                await ws.send(json.dumps({"type": "input_place_card", "x": 10, "y": 10}))
-            try:
-                msg = await asyncio.wait_for(ws.recv(), timeout=0.01)
-                data = json.loads(msg)
-                ui.update_from_snapshot(data)
-            except asyncio.TimeoutError:
-                pass
-            screen.fill((20, 120, 20))
-            ui.draw(screen)
-            pygame.display.flip()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-/engine/sim.py
-```python
-from engine.entities import Entity, Troop
-
-class Sim:
-    def __init__(self, seed=0):
-        self.tick_count = 0
-        self.entities = []
-        self.input_queue = []
-        self.seed = seed
-
-    def enqueue_input(self, msg):
-        self.input_queue.append(msg)
-
-    def tick(self):
-        # process inputs
-        for msg in self.input_queue:
-            if msg.get("type") == "input_place_card":
-                self.entities.append(Troop(x=msg["x"], y=msg["y"], team=1))
-        self.input_queue.clear()
-        # update entities
-        for e in self.entities:
-            e.update()
-        self.tick_count += 1
-
-    def snapshot(self):
-        return {
-            "tick": self.tick_count,
-            "entities": [e.to_dict() for e in self.entities],
-        }
-```
-
-/engine/entities.py
-```python
-class Entity:
-    def __init__(self, x, y, team):
-        self.x = x
-        self.y = y
-        self.team = team
-        self.hp = 100
-
-    def update(self):
-        pass
-
-    def to_dict(self):
-        return {"x": self.x, "y": self.y, "team": self.team, "hp": self.hp}
-
-class Troop(Entity):
-    def update(self):
-        self.x += 0.1
-```
-
-/engine/pathfinding.py
-```python
-import heapq
-
-def astar(grid, start, goal):
-    def h(a, b):
-        return abs(a[0]-b[0]) + abs(a[1]-b[1])
-    open_set = [(0, start)]
-    came_from = {}
-    g = {start: 0}
-    while open_set:
-        _, current = heapq.heappop(open_set)
-        if current == goal:
-            break
-        for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
-            nxt = (current[0]+dx, current[1]+dy)
-            if nxt not in grid:
-                continue
-            ng = g[current] + 1
-            if ng < g.get(nxt, 1e9):
-                g[nxt] = ng
-                f = ng + h(nxt, goal)
-                heapq.heappush(open_set, (f, nxt))
-                came_from[nxt] = current
-    return came_from
-```
-
-/ui/basic_ui.py
-```python
 import pygame
 
-class BasicUI:
-    def __init__(self):
-        self.elixir = 5
-        self.cards = ["card1", "card2", "card3", "card4"]
-        self.snapshot = {}
+# ==========================
+# Constants and Configuration
+# ==========================
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 1200
+FPS = 60
+TPS = 20
+DT_TICK = 1.0 / TPS
 
-    def update_from_snapshot(self, data):
-        self.snapshot = data
+GRID_WIDTH = 18
+GRID_HEIGHT = 32
+TILE_SIZE = SCREEN_WIDTH // GRID_WIDTH
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, (120, 0, 180), (50, 550, 200, 30))
-```
+RIVER_ROW = GRID_HEIGHT // 2
+BRIDGE_COLUMNS = (GRID_WIDTH // 3, GRID_WIDTH * 2 // 3)
 
-/cards/card_defs.json
-```json
+MAX_ELIXIR = 10
+START_ELIXIR = 5
+ELIXIR_SECONDS_PER_POINT = 2.8
+ELIXIR_TICKS_PER_POINT = int(round(ELIXIR_SECONDS_PER_POINT * TPS))
+
+PLAYER_TEAM = 1
+ENEMY_TEAM = 2
+
+# ==========================
+# Data-Driven Card Definitions (placeholder values)
+# ==========================
+CARD_DEFS_JSON = """
 {
   "cards": [
     {
@@ -494,195 +82,358 @@ class BasicUI:
       "abilities": [],
       "crown_tower_damage_scalar": 1.0,
       "level_scaling": {"hp_per_level": 70, "damage_per_level": 8}
-    },
-    {
-      "id": "ranged_archer_placeholder",
-      "name": "Archer (Placeholder)",
-      "rarity": "common",
-      "type": "troop",
-      "elixir_cost": 3,
-      "deploy_time_ticks": 20,
-      "stats": {
-        "hp": 300,
-        "damage": 90,
-        "hit_speed_ticks": 30,
-        "move_speed": "medium",
-        "range": 5.0,
-        "target_type": "both",
-        "splash": false,
-        "splash_radius": 0.0,
-        "mass": 1,
-        "projectile": {"speed": 6.0, "radius": 0.1, "travel_time_ticks": 10}
-      },
-      "abilities": [],
-      "crown_tower_damage_scalar": 1.0,
-      "level_scaling": {"hp_per_level": 20, "damage_per_level": 6}
-    },
-    {
-      "id": "building_cannon_placeholder",
-      "name": "Cannon (Placeholder)",
-      "rarity": "common",
-      "type": "building",
-      "elixir_cost": 3,
-      "deploy_time_ticks": 20,
-      "stats": {
-        "hp": 1500,
-        "damage": 180,
-        "hit_speed_ticks": 30,
-        "move_speed": "none",
-        "range": 5.5,
-        "target_type": "ground",
-        "splash": false,
-        "splash_radius": 0.0,
-        "mass": 5,
-        "projectile": {"speed": 7.0, "radius": 0.1, "travel_time_ticks": 10}
-      },
-      "abilities": ["pull"],
-      "crown_tower_damage_scalar": 1.0,
-      "level_scaling": {"hp_per_level": 100, "damage_per_level": 12}
-    },
-    {
-      "id": "spell_fireball_placeholder",
-      "name": "Fireball (Placeholder)",
-      "rarity": "rare",
-      "type": "spell",
-      "elixir_cost": 4,
-      "deploy_time_ticks": 10,
-      "stats": {
-        "hp": 0,
-        "damage": 325,
-        "hit_speed_ticks": 0,
-        "move_speed": "none",
-        "range": 0.0,
-        "target_type": "both",
-        "splash": true,
-        "splash_radius": 2.5,
-        "mass": 0,
-        "projectile": {"speed": 10.0, "radius": 0.1, "travel_time_ticks": 15}
-      },
-      "abilities": ["knockback"],
-      "crown_tower_damage_scalar": 0.4,
-      "level_scaling": {"hp_per_level": 0, "damage_per_level": 20}
     }
   ]
 }
-```
 """
 
-# =====================================================================
-# Additional deterministic strategy / performance / debug tools sections
-# =====================================================================
-DETERMINISM_STRATEGY = """
-Determinism Strategy
-- Fixed timestep 20 TPS; store time in ticks only.
-- Use integer or fixed-point where possible. If floats used, clamp/round at
-  defined precision (e.g., 1/1000 tile units) at each tick.
-- Seeded RNG per match; record seed in replay metadata.
-- All randomness derived from match seed + tick index.
-- Determinism checksums: hash entity states each tick; verify in replays.
-- Client prediction strictly visual; server is authoritative.
-"""
+CARD_DEFS = json.loads(CARD_DEFS_JSON)["cards"]
 
-PERFORMANCE_STRATEGY = """
-Performance Strategy
-- Object pooling for projectiles, particles, and common troops.
-- Spatial partitioning with grid buckets for targeting and collisions.
-- Path update throttling and caching; rebuild on obstacle change.
-- Pre-allocate arrays/lists where possible; avoid per-tick allocations.
-- Profiling hooks and frame budget monitors.
-"""
+# ==========================
+# Utility Functions
+# ==========================
 
-DEBUG_TOOLS_PLAN = """
-Debug Tools Plan
-- Hitbox overlay
-- Path overlay
-- Tick step mode (pause + single-step)
-- AI visualizer (targets, intent lines, heatmaps)
-- Network lag simulator (delay/jitter/loss)
-- Determinism checksum viewer per tick
-"""
+def clamp(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(value, max_value))
 
-# =====================================================================
-# Minimal in-file dataclasses to demonstrate schema intent
-# =====================================================================
-@dataclass
-class StatusEffect:
-    effect_type: str
-    duration_ticks: int
-    magnitude: float
-    stacking: str = "refresh"
 
+def grid_to_world(tile: Tuple[int, int]) -> Tuple[int, int]:
+    x, y = tile
+    return (x * TILE_SIZE + TILE_SIZE // 2, y * TILE_SIZE + TILE_SIZE // 2)
+
+
+def world_to_grid(pos: Tuple[int, int]) -> Tuple[int, int]:
+    x, y = pos
+    return (x // TILE_SIZE, y // TILE_SIZE)
+
+
+def manhattan(a: Tuple[int, int], b: Tuple[int, int]) -> int:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+# ==========================
+# Pathfinding (A*)
+# ==========================
+
+def astar(grid: List[List[int]], start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
+    open_set: List[Tuple[int, Tuple[int, int]]] = [(0, start)]
+    came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    g_score: Dict[Tuple[int, int], int] = {start: 0}
+
+    while open_set:
+        open_set.sort(key=lambda x: x[0])
+        _, current = open_set.pop(0)
+        if current == goal:
+            break
+
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nxt = (current[0] + dx, current[1] + dy)
+            if not (0 <= nxt[0] < GRID_WIDTH and 0 <= nxt[1] < GRID_HEIGHT):
+                continue
+            if grid[nxt[1]][nxt[0]] == 1:
+                continue
+            ng = g_score[current] + 1
+            if ng < g_score.get(nxt, 10**9):
+                g_score[nxt] = ng
+                f = ng + manhattan(nxt, goal)
+                open_set.append((f, nxt))
+                came_from[nxt] = current
+
+    if goal not in came_from and goal != start:
+        return [start]
+
+    path = [goal]
+    while path[-1] != start:
+        path.append(came_from[path[-1]])
+    path.reverse()
+    return path
+
+
+# ==========================
+# Core Entity Models
+# ==========================
 
 @dataclass
 class Entity:
     entity_id: int
     team: int
-    position: Tuple[int, int]
+    x: float
+    y: float
     hp: int
     radius: float
-    status_effects: List[StatusEffect] = field(default_factory=list)
+
+    def pos(self) -> Tuple[float, float]:
+        return (self.x, self.y)
 
 
 @dataclass
 class Troop(Entity):
-    move_speed: str = "medium"
-    damage: int = 0
-    hit_speed_ticks: int = 0
-    range: float = 0.0
-    target_type: str = "ground"
-
-
-@dataclass
-class Building(Entity):
-    lifetime_ticks: int = 0
-    pull_radius: float = 0.0
-
-
-@dataclass
-class Spell:
-    spell_id: str
-    radius: float
     damage: int
-    crown_tower_damage_scalar: float
+    hit_speed_ticks: int
+    range: float
+    move_speed: float
+    target_id: Optional[int] = None
+    attack_cooldown: int = 0
+    path: List[Tuple[int, int]] = field(default_factory=list)
 
 
 @dataclass
 class Tower(Entity):
-    tower_type: str = "princess"
-    activated: bool = False
+    damage: int
+    hit_speed_ticks: int
+    range: float
+    attack_cooldown: int = 0
 
 
-@dataclass
-class PlayerState:
-    player_id: str
-    elixir: float
-    hand: List[str]
-    deck: List[str]
-    crowns: int = 0
+# ==========================
+# Simulation Layer (Authoritative)
+# ==========================
+
+class Sim:
+    def __init__(self, seed: int = 12345) -> None:
+        self.rng = random.Random(seed)
+        self.tick_count = 0
+        self.entities: Dict[int, Entity] = {}
+        self.next_entity_id = 1
+        self.elixir = {PLAYER_TEAM: START_ELIXIR, ENEMY_TEAM: START_ELIXIR}
+        self.elixir_tick_counter = 0
+        self.grid = self._build_grid()
+        self._spawn_towers()
+
+    def _build_grid(self) -> List[List[int]]:
+        grid = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+        for x in range(GRID_WIDTH):
+            grid[RIVER_ROW][x] = 1
+        for bx in BRIDGE_COLUMNS:
+            grid[RIVER_ROW][bx] = 0
+        return grid
+
+    def _spawn_towers(self) -> None:
+        # Princess towers
+        princess_offsets = [(-4, -8), (4, -8)]
+        for dx, dy in princess_offsets:
+            x = GRID_WIDTH // 2 + dx
+            y = GRID_HEIGHT - 6 + dy
+            self._add_tower(PLAYER_TEAM, x, y)
+        for dx, dy in princess_offsets:
+            x = GRID_WIDTH // 2 + dx
+            y = 5 + dy
+            self._add_tower(ENEMY_TEAM, x, y)
+        # King towers
+        self._add_tower(PLAYER_TEAM, GRID_WIDTH // 2, GRID_HEIGHT - 3, king=True)
+        self._add_tower(ENEMY_TEAM, GRID_WIDTH // 2, 2, king=True)
+
+    def _add_tower(self, team: int, gx: int, gy: int, king: bool = False) -> None:
+        x, y = grid_to_world((gx, gy))
+        tower = Tower(
+            entity_id=self._next_id(),
+            team=team,
+            x=float(x),
+            y=float(y),
+            hp=1600 if king else 1200,
+            radius=28.0,
+            damage=90 if king else 70,
+            hit_speed_ticks=40,
+            range=180.0,
+        )
+        self.entities[tower.entity_id] = tower
+
+    def _next_id(self) -> int:
+        eid = self.next_entity_id
+        self.next_entity_id += 1
+        return eid
+
+    def can_place(self, team: int, gx: int, gy: int, elixir_cost: int) -> bool:
+        if team == PLAYER_TEAM and gy <= RIVER_ROW:
+            return False
+        if team == ENEMY_TEAM and gy >= RIVER_ROW:
+            return False
+        if self.grid[gy][gx] == 1:
+            return False
+        if self.elixir[team] < elixir_cost:
+            return False
+        return True
+
+    def place_troop(self, team: int, gx: int, gy: int, card_def: Dict[str, object]) -> bool:
+        if not self.can_place(team, gx, gy, int(card_def["elixir_cost"])):
+            return False
+        x, y = grid_to_world((gx, gy))
+        stats = card_def["stats"]
+        troop = Troop(
+            entity_id=self._next_id(),
+            team=team,
+            x=float(x),
+            y=float(y),
+            hp=int(stats["hp"]),
+            radius=18.0,
+            damage=int(stats["damage"]),
+            hit_speed_ticks=int(stats["hit_speed_ticks"]),
+            range=float(stats["range"]) * TILE_SIZE,
+            move_speed=60.0,
+        )
+        self.entities[troop.entity_id] = troop
+        self.elixir[team] -= int(card_def["elixir_cost"])
+        return True
+
+    def tick(self) -> None:
+        # Elixir
+        self.elixir_tick_counter += 1
+        if self.elixir_tick_counter >= ELIXIR_TICKS_PER_POINT:
+            self.elixir_tick_counter = 0
+            for team in (PLAYER_TEAM, ENEMY_TEAM):
+                self.elixir[team] = clamp(self.elixir[team] + 1, 0, MAX_ELIXIR)
+
+        # Update entities
+        entity_list = list(self.entities.values())
+        for entity in entity_list:
+            if isinstance(entity, Troop):
+                self._update_troop(entity)
+            if isinstance(entity, Tower):
+                self._update_tower(entity)
+
+        # Remove dead
+        for eid, ent in list(self.entities.items()):
+            if ent.hp <= 0:
+                del self.entities[eid]
+
+        self.tick_count += 1
+
+    def _find_target(self, source: Entity, target_team: int, max_range: float) -> Optional[int]:
+        best_id = None
+        best_dist = float("inf")
+        for ent in self.entities.values():
+            if ent.team != target_team:
+                continue
+            dx = ent.x - source.x
+            dy = ent.y - source.y
+            dist = math.hypot(dx, dy)
+            if dist <= max_range and dist < best_dist:
+                best_dist = dist
+                best_id = ent.entity_id
+        return best_id
+
+    def _update_troop(self, troop: Troop) -> None:
+        target_team = ENEMY_TEAM if troop.team == PLAYER_TEAM else PLAYER_TEAM
+        if troop.target_id not in self.entities:
+            troop.target_id = self._find_target(troop, target_team, troop.range + 120)
+
+        if troop.target_id is None:
+            return
+
+        target = self.entities[troop.target_id]
+        dx = target.x - troop.x
+        dy = target.y - troop.y
+        dist = math.hypot(dx, dy)
+
+        if dist <= troop.range:
+            if troop.attack_cooldown <= 0:
+                target.hp -= troop.damage
+                troop.attack_cooldown = troop.hit_speed_ticks
+            else:
+                troop.attack_cooldown -= 1
+            return
+
+        # Movement
+        if dist > 0:
+            step = troop.move_speed * DT_TICK
+            troop.x += (dx / dist) * step
+            troop.y += (dy / dist) * step
+
+    def _update_tower(self, tower: Tower) -> None:
+        target_team = ENEMY_TEAM if tower.team == PLAYER_TEAM else PLAYER_TEAM
+        if tower.attack_cooldown > 0:
+            tower.attack_cooldown -= 1
+            return
+        target_id = self._find_target(tower, target_team, tower.range)
+        if target_id is None:
+            return
+        target = self.entities[target_id]
+        target.hp -= tower.damage
+        tower.attack_cooldown = tower.hit_speed_ticks
 
 
-@dataclass
-class MatchState:
-    match_id: str
-    tick: int
-    arena_id: str
-    players: Dict[str, PlayerState]
-    entities: Dict[int, Entity]
-    overtime: bool = False
+# ==========================
+# Rendering / UI
+# ==========================
+
+class GameRenderer:
+    def __init__(self, screen: pygame.Surface) -> None:
+        self.screen = screen
+        self.font = pygame.font.SysFont("arial", 20)
+
+    def draw_arena(self) -> None:
+        self.screen.fill((55, 140, 70))
+        river_y = RIVER_ROW * TILE_SIZE
+        pygame.draw.rect(self.screen, (40, 80, 160), (0, river_y, SCREEN_WIDTH, TILE_SIZE))
+        for bx in BRIDGE_COLUMNS:
+            pygame.draw.rect(
+                self.screen,
+                (120, 80, 40),
+                (bx * TILE_SIZE, river_y, TILE_SIZE, TILE_SIZE),
+            )
+
+    def draw_entity(self, entity: Entity) -> None:
+        color = (40, 120, 240) if entity.team == PLAYER_TEAM else (220, 60, 60)
+        pygame.draw.circle(self.screen, color, (int(entity.x), int(entity.y)), int(entity.radius))
+        hp_text = self.font.render(str(entity.hp), True, (255, 255, 255))
+        self.screen.blit(hp_text, (entity.x - hp_text.get_width() // 2, entity.y - 35))
+
+    def draw_ui(self, sim: Sim) -> None:
+        elixir_text = self.font.render(f"Elixir: {sim.elixir[PLAYER_TEAM]:.0f}", True, (255, 255, 255))
+        self.screen.blit(elixir_text, (20, SCREEN_HEIGHT - 40))
+        tick_text = self.font.render(f"Tick: {sim.tick_count}", True, (255, 255, 255))
+        self.screen.blit(tick_text, (20, 20))
 
 
-def print_deliverables() -> None:
-    """Prints the master plan and skeleton to stdout."""
-    print(ARCHITECTURE)
-    print(PROTOCOL_SPEC)
-    print(DATA_SCHEMAS)
-    print(ROADMAP)
-    print(SKELETON_CODE)
-    print(DETERMINISM_STRATEGY)
-    print(PERFORMANCE_STRATEGY)
-    print(DEBUG_TOOLS_PLAN)
+# ==========================
+# Main Game Loop
+# ==========================
+
+def main() -> None:
+    pygame.init()
+    pygame.mixer.init()
+
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Clash Royale Remake Prototype")
+
+    clock = pygame.time.Clock()
+    renderer = GameRenderer(screen)
+    sim = Sim(seed=12345)
+
+    card_def = CARD_DEFS[0]
+
+    accumulator = 0.0
+    running = True
+
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+        accumulator += dt
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = pygame.mouse.get_pos()
+                gx, gy = world_to_grid((mx, my))
+                if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+                    sim.place_troop(PLAYER_TEAM, gx, gy, card_def)
+
+        # Fixed-step simulation
+        while accumulator >= DT_TICK:
+            sim.tick()
+            accumulator -= DT_TICK
+
+        # Render
+        renderer.draw_arena()
+        for entity in sim.entities.values():
+            renderer.draw_entity(entity)
+        renderer.draw_ui(sim)
+        pygame.display.flip()
+
+    pygame.quit()
 
 
 if __name__ == "__main__":
-    # Running this file prints the complete deliverables.
-    print_deliverables()
+    main()
