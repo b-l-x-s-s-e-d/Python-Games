@@ -804,6 +804,8 @@ class Projectile:
         lifetime=1.0,
         pierce=0,
         splash_radius=0.0,  # for rocket
+        homing_strength=0.0,
+        homing_range=0.0,
     ):
         self.pos = Vector2(pos)
         self.vel = Vector2(vel)
@@ -815,6 +817,8 @@ class Projectile:
         self.pierce = pierce
         self.hit_set = set()
         self.splash_radius = splash_radius
+        self.homing_strength = homing_strength
+        self.homing_range = homing_range
 
     def update(self, dt):
         self.life -= dt
@@ -895,6 +899,8 @@ class WeaponDef:
     chain_range: float = 0.0     # tesla chain range
     chain_damage_mult: float = 0.65
     base_pierce: int = 0         # weapon provides pierce baseline
+    homing_strength: float = 0.0
+    homing_range: float = 0.0
 
 
 WEAPONS: Dict[str, WeaponDef] = {
@@ -1062,6 +1068,19 @@ WEAPONS: Dict[str, WeaponDef] = {
         bullet_radius=7,
         recoil=150.0,
         splash_radius=150,
+    ),
+    "seeker": WeaponDef(
+        id="seeker",
+        name="Seeker",
+        desc="Heavy shots with slight homing",
+        base_damage=34,
+        fire_cd=0.62,
+        bullet_speed=720.0,
+        bullet_life=1.2,
+        bullet_radius=5,
+        recoil=55.0,
+        homing_strength=1.1,
+        homing_range=480.0,
     ),
 }
 
@@ -1777,6 +1796,7 @@ UPGRADES = [
     UpgradeDef("damage", "Overcharged Rounds", "Deal more damage per shot.", "DMG"),
     UpgradeDef("fire_rate", "Rapid Trigger", "Shoot faster.", "FR"),
     UpgradeDef("bullet_speed", "Rail Assist", "Bullets travel faster.", "BSPD"),
+    UpgradeDef("homing", "Guidance Module", "Bullets curve harder toward enemies.", "HOME"),
     UpgradeDef("max_hp", "Reinforced Core", "Increase max HP by 1.", "HP"),
     UpgradeDef("move_speed", "Neon Strides", "Move faster.", "MOVE"),
     UpgradeDef("dash_cd", "Reflex Coil", "Dash cooldown reduced.", "CD"),
@@ -1829,6 +1849,7 @@ SHOP_ITEMS = [
     ShopItemDef("unlock_electricity", "Unlock: Electricity", "Chains many enemies", 1, 400, 1.0, "weapon", weapon_id="electricity"),
     ShopItemDef("unlock_windscreen_wiper", "Unlock: Windscreen Wiper", "Wipes the map clean...", 1, math.inf, 1.0, "weapon", weapon_id="windscreen"),
     ShopItemDef("unlock_tank", "Unlock: Tank", "Insane damage but very slow", 1, 390, 1.0, "weapon", weapon_id="tank"),
+    ShopItemDef("unlock_seeker", "Unlock: Seeker", "Heavy rounds with slight homing", 1, 360, 1.0, "weapon", weapon_id="seeker"),
 ]
 
 SHOP_ITEMS_BY_ID = {item.id: item for item in SHOP_ITEMS}
@@ -1959,6 +1980,8 @@ class Player:
         self.dash_time_bonus = 0.0
         self.knockback_mult = 1.0
         self.magnet_bonus = 0.0
+        self.homing_bonus = 0.0
+        self.homing_range_bonus = 0.0
 
         self.max_hp = PLAYER_MAX_HP_BASE
         self.hp = self.max_hp
@@ -2064,6 +2087,9 @@ class Player:
             self.knockback_mult = min(2.0, self.knockback_mult * 1.18)
         elif up_id == "magnet":
             self.magnet_bonus = min(120.0, self.magnet_bonus + 35.0)
+        elif up_id == "homing":
+            self.homing_bonus = min(3.0, self.homing_bonus + 0.7)
+            self.homing_range_bonus = min(320.0, self.homing_range_bonus + 80.0)
 
     def get_damage(self) -> int:
         dmg = self.weapon.base_damage
@@ -3654,6 +3680,25 @@ class Game:
                     b.vel = b.vel.lerp(desired, 1 - math.exp(-dt * 1.25))
             b.update(dt)
 
+    def update_player_projectiles(self, dt: float):
+        for b in self.projectiles:
+            if b.homing_strength > 0.0:
+                best = None
+                best_d2 = (b.homing_range ** 2) if b.homing_range > 0 else float("inf")
+                for e in self.enemies:
+                    if not e.alive():
+                        continue
+                    d2 = (e.pos - b.pos).length_squared()
+                    if d2 < best_d2:
+                        best_d2 = d2
+                        best = e
+                if best is not None:
+                    d = best.pos - b.pos
+                    if d.length_squared() > 1:
+                        desired = d.normalize() * max(80.0, b.vel.length())
+                        b.vel = b.vel.lerp(desired, 1 - math.exp(-dt * b.homing_strength))
+            b.update(dt)
+
     def update_enemy_explosions(self, dt: float):
         if not self.pending_enemy_explosions:
             return
@@ -3815,6 +3860,8 @@ class Game:
             col = base_col if not is_crit else (255, 240, 120)
             splash = w.splash_radius if w.splash_radius > 0 else 0.0
             pierce_total = max(0, player.piercing + int(getattr(w, "base_pierce", 0)))
+            homing_strength = max(0.0, w.homing_strength + player.homing_bonus)
+            homing_range = max(0.0, w.homing_range + player.homing_range_bonus)
             b = Projectile(
                 player.pos + dirn * (PLAYER_RADIUS + 7),
                 vel,
@@ -3824,7 +3871,9 @@ class Game:
                 radius=w.bullet_radius,
                 lifetime=life,
                 pierce=pierce_total,
-                splash_radius=splash
+                splash_radius=splash,
+                homing_strength=homing_strength,
+                homing_range=homing_range,
             )
             self.projectiles.append(b)
 
@@ -4266,8 +4315,7 @@ class Game:
 
         self.pickups = [p for p in self.pickups if not self._handle_pickup_collect(p)]
 
-        for b in self.projectiles:
-            b.update(dt)
+        self.update_player_projectiles(dt)
         self.update_enemy_projectiles(dt)
 
         arena = self.arena_rect
@@ -4584,7 +4632,12 @@ class Game:
     # ---------------- Level up screen ----------------
     def open_levelup(self):
         self.set_state("levelup")
-        self.level_choices = random.sample(UPGRADES, 3)
+        upgrade_pool = [
+            up for up in UPGRADES
+            if up.id != "homing"
+            or (self.mode == "endless" and self.player.weapon_id == "seeker")
+        ]
+        self.level_choices = random.sample(upgrade_pool, 3)
 
         cx = WIDTH // 2
         bw, bh = 720, 94
