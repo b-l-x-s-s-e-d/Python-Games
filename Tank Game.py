@@ -5359,11 +5359,11 @@ class Game:
         pygame.draw.circle(self.screen, (*C_WALL_EDGE, 210), wheel_center, wheel_radius, 3)
         pygame.draw.circle(self.screen, (*C_PANEL, 200), wheel_center, 8)
 
-        pointer_y = wheel_center[1] - wheel_radius - 12
+        pointer_y = wheel_center[1] - wheel_radius + 12
         pointer = [
             (wheel_center[0], pointer_y),
-            (wheel_center[0] - 12, pointer_y + 18),
-            (wheel_center[0] + 12, pointer_y + 18),
+            (wheel_center[0] - 12, pointer_y - 18),
+            (wheel_center[0] + 12, pointer_y - 18),
         ]
         pygame.draw.polygon(self.screen, C_ACCENT_2, pointer)
 
@@ -6344,4 +6344,5 @@ class Game:
 # =========================================================
 if __name__ == "__main__":
     Game().run()
+
 
